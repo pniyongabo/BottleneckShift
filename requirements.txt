@@ -1,0 +1,2 @@
+# Runtime benchmark dependency. Pin changes require a new experiment series.
+vllm==0.11.0
