@@ -14,16 +14,17 @@ findings.
 ## Controls and procedure
 
 1. Use a dedicated, otherwise-idle GPU host and record its environment automatically.
-2. Run `configs/milestone1.toml` without editing it after a series begins.
+2. Run `configs/milestone1-forward.toml` without editing it after a series begins.
 3. Keep the server alive across conditions so model loading is not part of timings.
 4. Execute three repetitions per condition and preserve every raw result and failure.
-5. Repeat the entire series with reversed condition order before drawing conclusions.
+5. Repeat with `configs/milestone1-reverse.toml` before drawing conclusions.
 6. Compare repetition distributions; report errors and realized token counts before
    interpreting latency or throughput.
 
-The initial runner uses fixed order to remain transparent and minimal. A second,
-reversed config is intentionally not checked in until the first GPU/model choice is
-confirmed. Any deviations belong in the report and alongside the archived results.
+The two explicit plans intentionally duplicate their small configurations: this is
+easier to review than custom configuration inheritance. Warm-up results are retained
+but labelled separately and excluded from analysis. Any deviations belong in the
+report and alongside the archived results.
 
 ## Interpretation guardrails
 

@@ -1,8 +1,11 @@
 # Results policy
 
 `results/runs/` and `results/figures/` are generated and ignored by Git by default.
-Each run directory contains the copied config, `manifest.json`, server log, benchmark
-stdout/stderr, and vLLM's raw `requests.json` for every repetition.
+Each series directory contains the copied config, `manifest.json`, server log, a
+separate `warmup/` directory, and measured condition/repetition directories. Each
+benchmark directory contains stdout/stderr, a run manifest, and vLLM's raw
+`requests.json`. Warm-up observations are retained for diagnosis but are never study
+measurements and are excluded by `analysis/compare.py`.
 
 Commit only small, reviewed, machine-readable results needed to reproduce a published
 figure, plus the figure and a provenance note. Never commit model weights, caches,

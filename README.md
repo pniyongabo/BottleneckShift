@@ -75,23 +75,50 @@ python -m pip install -r requirements.txt
 python -m pip install -e '.[test]'
 ```
 
-Validate configuration without a GPU:
+Review the full forward execution plan without requiring vLLM or a GPU:
 
 ```bash
-python scripts/run_experiment.py --config configs/milestone1.toml --dry-run
+python scripts/run_experiment.py --config configs/milestone1-forward.toml \
+  --series-id DEVICE-MODEL-forward-01 --dry-run
 ```
 
-On the GPU host, the exact first real command is:
+On the GPU host, verify that vLLM, `nvidia-smi`, the output location, and server port
+are available. Preflight does not start the server or run inference:
 
 ```bash
-python scripts/run_experiment.py --config configs/milestone1.toml
+python scripts/run_experiment.py --config configs/milestone1-forward.toml \
+  --series-id DEVICE-MODEL-forward-01 --preflight
 ```
 
-The runner starts one vLLM server, waits for its health endpoint, executes all
-conditions and repetitions in the order written, and stops the server. For stronger
-protection against thermal/order effects, run again with the reversed condition
-order in a copied config. Do not commit results until inspecting their manifests for
-hostnames or other unwanted metadata.
+Then run the forward and reverse series with distinct, meaningful series IDs:
+
+```bash
+python scripts/run_experiment.py --config configs/milestone1-forward.toml \
+  --series-id DEVICE-MODEL-forward-01
+python scripts/run_experiment.py --config configs/milestone1-reverse.toml \
+  --series-id DEVICE-MODEL-reverse-01
+```
+
+Replace `DEVICE-MODEL` with a non-identifying label for the selected setup. A series
+ID may contain letters, numbers, dots, underscores, and hyphens and cannot be reused.
+If omitted, a timestamped ID is generated.
+
+The runner starts one vLLM server, waits for its health endpoint, performs a labelled
+warm-up, executes all measured repetitions in the configured order, and stops the
+server. A cooldown separates benchmark invocations. Forward and reverse plans have
+identical server, workload, and execution settings; only their plan name and condition
+order differ. Do not commit results until inspecting manifests for identifying host
+metadata.
+
+### Run lifecycle and artifacts
+
+The series manifest progresses through `planned`, `warming_up`, `running`, and
+`complete`; exceptions produce `failed`, while a keyboard interrupt produces
+`interrupted`. Before each invocation, `active_run` identifies the condition and
+repetition. Each raw result has a colocated run manifest containing the series and
+plan IDs, measurement role, requested token targets, concurrency, command, timestamps,
+and exit status. Warm-up data is retained under `warmup/` for troubleshooting but is
+not a measured observation and is ignored by analysis.
 
 Analyze all completed repetitions:
 
@@ -99,9 +126,9 @@ Analyze all completed repetitions:
 python analysis/compare.py results/runs --output results/figures/milestone1.svg
 ```
 
-The analysis refuses to invent missing observations. It prints a run-level CSV
-summary and, when valid raw results exist, makes a figure showing repetition-level
-distributions rather than presenting a single run as definitive.
+The analysis refuses to invent missing observations. It prints a series-labelled,
+run-level CSV summary and, when valid measured results exist, makes a figure showing
+repetition-level distributions rather than presenting a single run as definitive.
 
 ## Repository layout
 

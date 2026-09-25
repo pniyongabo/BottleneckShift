@@ -26,7 +26,8 @@ def numeric_values(document: dict, key: str) -> list[float]:
 
 def summarize(path: Path) -> dict:
     document = json.loads(path.read_text())
-    row = {"condition": path.parent.parent.name, "repetition": path.parent.name, "path": str(path)}
+    row = {"series_id": path.parents[2].name, "condition": path.parent.parent.name,
+           "repetition": path.parent.name, "path": str(path)}
     for label, (key, scale) in METRICS.items():
         values = numeric_values(document, key)
         row[label] = statistics.median(values) * scale if values else None
@@ -73,7 +74,8 @@ def main() -> int:
     parser.add_argument("results_dir", type=Path)
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args()
-    paths = sorted(args.results_dir.glob("**/requests.json"))
+    paths = sorted(path for path in args.results_dir.glob("**/requests.json")
+                   if path.parent.name != "warmup")
     if not paths:
         parser.error(f"no requests.json files found below {args.results_dir}")
     rows = [summarize(path) for path in paths]
