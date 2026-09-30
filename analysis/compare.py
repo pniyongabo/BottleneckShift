@@ -8,33 +8,54 @@ import json
 import statistics
 from pathlib import Path
 
-METRICS = {
-    "ttft_ms": ("ttfts", 1000),
-    "tpot_ms": ("tpots", 1000),
-    "e2el_ms": ("e2els", 1000),
-    "itl_ms": ("itls", 1000),
-}
+
+def successful_requests(document: dict) -> list[dict]:
+    """Return per-request TTFT, TPOT, E2E latency, and ITLs in seconds.
+
+    vLLM's saved result holds per-request ``ttfts``, ``itls``, ``output_lens``,
+    and ``errors`` lists but not per-request TPOT or E2E latency, so both are
+    derived here: E2E is TTFT plus the request's ITLs, and TPOT matches vLLM's
+    definition of decode time divided by ``output_len - 1``.
+    """
+    ttfts = document.get("ttfts", [])
+    itls = document.get("itls", [])
+    output_lens = document.get("output_lens", [])
+    errors = document.get("errors", [])
+    requests = []
+    for index, ttft in enumerate(ttfts):
+        if index < len(errors) and errors[index]:
+            continue
+        request_itls = [float(value) for value in (itls[index] if index < len(itls) else [])]
+        decode = sum(request_itls)
+        output_len = output_lens[index] if index < len(output_lens) else len(request_itls) + 1
+        requests.append({
+            "ttft": float(ttft),
+            "tpot": decode / (output_len - 1) if output_len > 1 else None,
+            "e2el": float(ttft) + decode,
+            "itls": request_itls,
+        })
+    return requests
 
 
-def numeric_values(document: dict, key: str) -> list[float]:
-    values = document.get(key, [])
-    # ITLs can be represented as one list per request.
-    if values and isinstance(values[0], list):
-        values = [item for request in values for item in request]
-    return [float(value) for value in values if isinstance(value, (int, float))]
+def median_ms(values: list[float | None]) -> float | None:
+    values = [value for value in values if value is not None]
+    return statistics.median(values) * 1000 if values else None
 
 
 def summarize(path: Path) -> dict:
     document = json.loads(path.read_text())
     row = {"series_id": path.parents[2].name, "condition": path.parent.parent.name,
            "repetition": path.parent.name, "path": str(path)}
-    for label, (key, scale) in METRICS.items():
-        values = numeric_values(document, key)
-        row[label] = statistics.median(values) * scale if values else None
+    requests = successful_requests(document)
+    row["ttft_ms"] = median_ms([request["ttft"] for request in requests])
+    row["tpot_ms"] = median_ms([request["tpot"] for request in requests])
+    row["e2el_ms"] = median_ms([request["e2el"] for request in requests])
+    row["itl_ms"] = median_ms([itl for request in requests for itl in request["itls"]])
     row["request_throughput"] = document.get("request_throughput")
     row["output_token_throughput"] = document.get("output_throughput")
-    errors = document.get("errors", [])
-    row["errors"] = len(errors) if isinstance(errors, list) else document.get("num_errors", 0)
+    errors = document.get("errors")
+    # vLLM records one entry per request; successful requests have an empty string.
+    row["errors"] = sum(1 for error in errors if error) if isinstance(errors, list) else document.get("failed", 0)
     return row
 
 
