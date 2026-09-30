@@ -67,6 +67,12 @@ runs before implementation.
 Prerequisites are Linux, Python 3.11, a CUDA-capable GPU supported by the pinned
 vLLM release, and enough VRAM for the selected model. Create a clean environment:
 
+For a cost-controlled workflow on AWS, GCP, Azure, or public GPU clouds, review the
+[GPU cloud development and execution plan](experiments/gpu-cloud-development-plan.md)
+before provisioning. It separates disposable spot-instance debugging from
+non-interruptible measured runs and includes cost gates, artifact handling, and a
+failure/retry policy.
+
 ```bash
 python3.11 -m venv .venv
 source .venv/bin/activate
