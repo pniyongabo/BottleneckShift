@@ -55,12 +55,17 @@ metadata, package inventory, and best-effort GPU inventory.
 | 2 | Does the milestone 1 effect persist under explicit cache and sampling controls? | Configs merged; awaiting measured pair |
 | 3 | Prefill- vs decode-heavy regimes at C1/C8, plus one contention intervention | Planned |
 | 4 | Adaptive backend selection, only if milestone 3 finds distinguishable states | Optional |
+| 5 | Workload shape: short/long input and output factorial | Planned |
+| 6 | Network: controlled latency/bandwidth/loss shaping | Planned |
+| 7 | Host contention: controlled CPU and memory pressure | Planned |
+| 8 | GPU contention: isolated, controlled competing GPU work | Planned |
+| 9 | Bottleneck shift: selected crossed factors from milestones 5–8 | Planned |
 
 The later rows are proposals, not completed experiments or findings. Each will need
 a written hypothesis, randomized run order, controls, safety checks, and repeated
-runs before implementation. Network, host, and GPU contention are candidate
-milestone 3 interventions rather than separate stages; see the
-[milestones 2–4 plan](experiments/milestones-2-4.md).
+runs before implementation. Milestone 3 uses a narrow slice of milestones 5–8 (two
+workload regimes and one contention intervention); milestones 5–9 are the full
+single-factor studies and their crossing. See the [roadmap](experiments/roadmap.md).
 
 ## Reproduce milestone 1
 

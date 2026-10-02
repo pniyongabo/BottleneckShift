@@ -1,4 +1,4 @@
-# BottleneckShift: Milestones 2–4
+# BottleneckShift roadmap: Milestones 2–9
 
 **Drafted October 2, 2026**
 **Reviewed state:** `main` at `20602610df9e30401c1d193ae668c5b6d55c0a48`
@@ -168,10 +168,43 @@ prior-work check.
 **Effort:** approximately 8–12 focused hours if the entry gate passes. Otherwise use
 this time to strengthen Milestone 3 and the final report.
 
+## Milestones 5–9 — Full factor studies
+
+These are the original planned stages, kept as later milestones. Milestone 3 takes a
+deliberately narrow slice of them: two workload regimes and one contention
+intervention. Each milestone below widens one factor into its own pre-registered
+study, reusing the Milestone 2 controls and the Milestone 3 tooling (server-side
+metrics, telemetry, request matching). None is scheduled within the current budget.
+
+| Milestone | Factor | Conditions |
+|---|---|---|
+| 5 | Workload shape | short/long input and output factorial |
+| 6 | Network | controlled latency/bandwidth/loss shaping |
+| 7 | Host contention | controlled CPU and memory pressure |
+| 8 | GPU contention | isolated, controlled competing GPU work |
+| 9 | Bottleneck shift | selected crossed factors from milestones 5–8 |
+
+Notes for planning:
+
+* **Milestone 5** generalizes Milestone 3's two regimes into a full factorial; it
+  needs the per-condition workload support listed under Milestone 3.
+* **Milestone 6** needs the client off the server host, or shaping applied to a
+  network path the client actually uses; loopback shaping on one host is not
+  representative.
+* **Milestone 7** inherits the 4-vCPU constraint: pin client, server, and stressor,
+  or use a separate client host.
+* **Milestone 8** needs a competing GPU workload with a fixed, recorded intensity, and
+  a check that it does not exhaust VRAM for the vLLM server.
+* **Milestone 9** crosses only the factors that milestones 5–8 show to matter, rather
+  than running the full grid.
+
+Whichever factor Milestone 3 chooses as its intervention gives that milestone a head
+start. Its Milestone 3 data are a pilot, not a substitute for the full study.
+
 ## Priority, budget, and final artifact
 
 Finish Milestone 2, then make Milestone 3 the core contribution. Milestone 4 is
-optional.
+optional. Milestones 5–9 are beyond the current budget.
 
 Planned effort is roughly 27–40 focused hours: 4–6 for Milestone 2, 15–22 for
 Milestone 3, and 8–12 for Milestone 4. Hours already spent on Milestone 1 count
