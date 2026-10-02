@@ -33,6 +33,8 @@ def server_command(config: dict) -> list[str]:
         command += ["--revision", str(server["model_revision"])]
     if "tokenizer_revision" in server:
         command += ["--tokenizer-revision", str(server["tokenizer_revision"])]
+    if "generation_config" in server:
+        command += ["--generation-config", str(server["generation_config"])]
     if "enable_prefix_caching" in server:
         command.append("--enable-prefix-caching" if server["enable_prefix_caching"]
                        else "--no-enable-prefix-caching")
@@ -62,10 +64,14 @@ def build_plan(config: dict, root: Path) -> list[dict]:
     plan = []
     execution = config["execution"]
     if execution["warmup_prompts"]:
-        concurrencies = execution.get("warmup_concurrencies", [execution["warmup_max_concurrency"]])
-        for concurrency in concurrencies:
-            directory = root / "warmup" / f"c{concurrency}"
-            plan.append({"measurement_role": "warmup", "condition": f"warmup_c{concurrency}",
+        if "warmup_concurrencies" in execution:
+            warmups = [(f"warmup_c{value}", root / "warmup" / f"c{value}", value)
+                       for value in execution["warmup_concurrencies"]]
+        else:
+            # Configs without warmup_concurrencies keep the historical single warm-up layout.
+            warmups = [("warmup", root / "warmup", execution["warmup_max_concurrency"])]
+        for condition, directory, concurrency in warmups:
+            plan.append({"measurement_role": "warmup", "condition": condition,
                          "repetition": None, "max_concurrency": concurrency, "directory": directory,
                          "command": benchmark_command(config, concurrency, directory,
                                                       execution["warmup_prompts"])})
@@ -156,6 +162,7 @@ def main() -> int:
         "prefix_caching": config["server"].get("enable_prefix_caching", "vllm_default"),
         "model_revision": config["server"].get("model_revision", "unresolved"),
         "tokenizer_revision": config["server"].get("tokenizer_revision", "unresolved"),
+        "generation_config": config["server"].get("generation_config", "vllm_default"),
         "sampling": config.get("sampling", "vllm_benchmark_defaults"),
         "warmup_concurrencies": config["execution"].get(
             "warmup_concurrencies", [config["execution"]["warmup_max_concurrency"]]),

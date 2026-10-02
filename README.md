@@ -152,31 +152,33 @@ zero failures and exact configured token lengths. This is a reported external
 validation run, not a rerun performed from this checkout; see the report for its
 scope and the checks that remain dependent on the retained archive.
 
-### Controls for the next protocol
+### Controlled follow-up protocol
 
-The historical configs remain unchanged. A newly reviewed config can control the
-cache, warm both workload levels, pin model assets, and make sampling explicit:
+The historical configs remain unchanged. The reviewed follow-up plans
+`configs/milestone1-controlled-forward.toml` and
+`configs/milestone1-controlled-reverse.toml` keep the milestone 1 model, workload,
+server, and execution settings and add these controls:
 
-```toml
-[execution]
-warmup_prompts = 10
-warmup_max_concurrency = 1 # retained for compatibility
-warmup_concurrencies = [1, 8]
-cooldown_seconds = 15
+* model and tokenizer pinned to Hugging Face commit
+  `7ae557604adf67be50417f59c2c2f167def9a775`, the commit `main` resolved to on
+  October 1, 2026 (last modified September 25, 2024);
+* prefix caching explicitly disabled, so the repeated seed-2027 prompts cannot reuse
+  KV cache across warm-ups and repetitions;
+* `generation_config = "vllm"`, so the model's `generation_config.json` defaults
+  (`repetition_penalty` 1.1, `top_k` 20, logged by the milestone 1 server) no
+  longer silently apply;
+* request-level greedy sampling: `temperature = 0.0`, `top_p = 1.0`; and
+* separate 10-prompt warm-ups at concurrency 1 and 8.
 
-[server]
-# ...the existing server fields...
-model_revision = "IMMUTABLE_COMMIT_ID"
-tokenizer_revision = "IMMUTABLE_COMMIT_ID"
-enable_prefix_caching = false
+These values are passed to the vLLM CLIs and copied into both series and run
+manifests. `vllm bench serve` has no tokenizer-revision option, so the client
+tokenizes generated prompts with `main`; validation of exact 256-token input lengths
+guards against a silent tokenizer change. Use new series IDs, for example:
 
-[sampling]
-temperature = 0.0
-top_p = 1.0
+```bash
+python scripts/run_experiment.py --config configs/milestone1-controlled-forward.toml \
+  --series-id DEVICE-MODEL-controlled-forward-01 --dry-run
 ```
-
-Replace the placeholders with reviewed immutable revisions; do not run them as-is.
-These values are passed to the vLLM CLIs and copied into both series and run manifests.
 
 ## Repository layout
 

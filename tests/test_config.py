@@ -42,3 +42,19 @@ def test_explicit_followup_controls_are_validated(tmp_path):
     config = load_config(path)
     assert config["execution"]["warmup_concurrencies"] == [1, 8]
     assert config["server"]["enable_prefix_caching"] is False
+
+
+def test_controlled_followup_configs_pin_controls_and_differ_only_in_order():
+    forward = load_config(Path("configs/milestone1-controlled-forward.toml"))
+    reverse = load_config(Path("configs/milestone1-controlled-reverse.toml"))
+    for key in ("server", "workload", "execution", "sampling"):
+        assert forward[key] == reverse[key]
+    assert list(reversed(forward["condition"])) == reverse["condition"]
+    server = forward["server"]
+    for key in ("model_revision", "tokenizer_revision"):
+        assert len(server[key]) == 40 and all(char in "0123456789abcdef" for char in server[key])
+    assert server["enable_prefix_caching"] is False
+    assert server["generation_config"] == "vllm"
+    assert forward["execution"]["warmup_concurrencies"] == [1, 8]
+    assert forward["sampling"] == {"temperature": 0.0, "top_p": 1.0}
+    assert forward["experiment"]["name"] != load_config(Path("configs/milestone1-forward.toml"))["experiment"]["name"]

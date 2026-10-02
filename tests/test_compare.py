@@ -45,3 +45,21 @@ def test_summary_reports_token_ranges(tmp_path):
     row = compare.summarize(write_result(tmp_path, document))
     assert (row["input_tokens_min"], row["input_tokens_max"]) == (3, 4)
     assert (row["output_tokens_min"], row["output_tokens_max"]) == (2, 5)
+
+
+def test_main_excludes_every_warmup_path(tmp_path, monkeypatch, capsys):
+    measured = {"ttfts": [0.1, 0.2], "itls": [[0.01], [0.01]], "input_lens": [3, 3],
+                "output_lens": [2, 2], "errors": ["", ""]}
+    series = tmp_path / "runs" / "synthetic"
+    for relative in ("warmup", "warmup/c1", "warmup/c8", "baseline_c1/rep-01"):
+        (series / relative).mkdir(parents=True)
+        (series / relative / "requests.json").write_text(json.dumps(measured))
+    monkeypatch.setattr("sys.argv", ["compare.py", str(tmp_path / "runs"),
+                                     "--output", str(tmp_path / "figure.svg")])
+    assert compare.main() == 0
+    lines = capsys.readouterr().out.strip().splitlines()
+    assert len(lines) == 2
+    header, row = lines[0].split(","), dict(zip(lines[0].split(","), lines[1].split(",")))
+    assert {"requests", "input_tokens_min", "input_tokens_max",
+            "output_tokens_min", "output_tokens_max"} <= set(header)
+    assert (row["condition"], row["requests"], row["input_tokens_max"]) == ("baseline_c1", "2", "3")

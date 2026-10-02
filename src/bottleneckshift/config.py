@@ -46,6 +46,8 @@ def load_config(path: Path) -> dict:
     for key in ("model_revision", "tokenizer_revision"):
         if key in server and not str(server[key]).strip():
             raise ValueError(f"server.{key} cannot be empty")
+    if "generation_config" in server and not str(server["generation_config"]).strip():
+        raise ValueError("server.generation_config cannot be empty")
     if "enable_prefix_caching" in server and not isinstance(server["enable_prefix_caching"], bool):
         raise ValueError("server.enable_prefix_caching must be a boolean")
     sampling = config.get("sampling", {})
