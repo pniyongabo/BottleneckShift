@@ -49,18 +49,18 @@ metadata, package inventory, and best-effort GPU inventory.
 
 ## Experimental matrix
 
-| Stage | Factor | Conditions | Status |
-|---|---|---|---|
-| 1 | Workload concurrency | 1 vs 8, fixed generated token targets | **Completed; [reviewed report](reports/milestone1-20261001T205137Z.md)** |
-| 2 | Workload shape | short/long input and output factorial | Planned |
-| 3 | Network | controlled latency/bandwidth/loss shaping | Planned |
-| 4 | Host contention | controlled CPU and memory pressure | Planned |
-| 5 | GPU contention | isolated, controlled competing GPU work | Planned |
-| 6 | Bottleneck shift | selected crossed factors from stages 2–5 | Planned |
+| Milestone | Question | Status |
+|---|---|---|
+| 1 | Workload concurrency: 1 vs 8, fixed generated token targets (cache-enabled) | **Completed; [reviewed report](reports/milestone1-20261001T205137Z.md)** |
+| 2 | Does the milestone 1 effect persist under explicit cache and sampling controls? | Configs merged; awaiting measured pair |
+| 3 | Prefill- vs decode-heavy regimes at C1/C8, plus one contention intervention | Planned |
+| 4 | Adaptive backend selection, only if milestone 3 finds distinguishable states | Optional |
 
 The later rows are proposals, not completed experiments or findings. Each will need
 a written hypothesis, randomized run order, controls, safety checks, and repeated
-runs before implementation.
+runs before implementation. Network, host, and GPU contention are candidate
+milestone 3 interventions rather than separate stages; see the
+[milestones 2–4 plan](experiments/milestones-2-4.md).
 
 ## Reproduce milestone 1
 
@@ -154,6 +154,7 @@ scope and the checks that remain dependent on the retained archive.
 
 ### Controlled follow-up protocol
 
+This is the milestone 2 protocol.
 The historical configs remain unchanged. The reviewed follow-up plans
 `configs/milestone1-controlled-forward.toml` and
 `configs/milestone1-controlled-reverse.toml` keep the milestone 1 model, workload,
