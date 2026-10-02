@@ -51,6 +51,8 @@ def summarize(path: Path) -> dict:
     row["tpot_ms"] = median_ms([request["tpot"] for request in requests])
     row["e2el_ms"] = median_ms([request["e2el"] for request in requests])
     row["itl_ms"] = median_ms([itl for request in requests for itl in request["itls"]])
+    # vLLM's own median, saved only when e2el is in --percentile-metrics; audits e2el_ms.
+    row["vllm_median_e2el_ms"] = document.get("median_e2el_ms")
     row["request_throughput"] = document.get("request_throughput")
     row["output_token_throughput"] = document.get("output_throughput")
     errors = document.get("errors")

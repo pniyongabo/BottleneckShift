@@ -173,8 +173,11 @@ server, and execution settings and add these controls:
 * `generation_config = "vllm"`, so the model's `generation_config.json` defaults
   (`repetition_penalty` 1.1, `top_k` 20, logged by the milestone 1 server) no
   longer silently apply;
-* request-level greedy sampling: `temperature = 0.0`, `top_p = 1.0`; and
-* separate 10-prompt warm-ups at concurrency 1 and 8.
+* request-level greedy sampling: `temperature = 0.0`, `top_p = 1.0`;
+* separate 10-prompt warm-ups at concurrency 1 and 8; and
+* `percentile_metrics` including `e2el`, so each result also saves vLLM's own
+  `median_e2el_ms`, reported by the analysis as `vllm_median_e2el_ms` to audit the
+  reconstructed `e2el_ms`.
 
 These values are passed to the vLLM CLIs and copied into both series and run
 manifests. `vllm bench serve` has no tokenizer-revision option, so the client

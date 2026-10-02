@@ -57,4 +57,15 @@ def test_controlled_followup_configs_pin_controls_and_differ_only_in_order():
     assert server["generation_config"] == "vllm"
     assert forward["execution"]["warmup_concurrencies"] == [1, 8]
     assert forward["sampling"] == {"temperature": 0.0, "top_p": 1.0}
+    assert forward["execution"]["percentile_metrics"] == ["ttft", "tpot", "itl", "e2el"]
     assert forward["experiment"]["name"] != load_config(Path("configs/milestone1-forward.toml"))["experiment"]["name"]
+
+
+@pytest.mark.parametrize("value, message", [([], "must list"), (["ttft", "p99"], "must list"),
+                                            (["e2el", "e2el"], "unique")])
+def test_percentile_metrics_are_validated(tmp_path, value, message):
+    path = tmp_path / "bad.toml"
+    source = Path("configs/milestone1-forward.toml").read_text()
+    path.write_text(source.replace("cooldown_seconds = 15", f"cooldown_seconds = 15\npercentile_metrics = {value!r}".replace("'", '"')))
+    with pytest.raises(ValueError, match=message):
+        load_config(path)
