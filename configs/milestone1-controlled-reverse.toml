@@ -9,6 +9,8 @@ warmup_prompts = 10
 warmup_max_concurrency = 1 # retained for compatibility
 warmup_concurrencies = [1, 8]
 cooldown_seconds = 15
+# Save vLLM's own E2E latency so the reconstructed e2el_ms can be audited.
+percentile_metrics = ["ttft", "tpot", "itl", "e2el"]
 
 [server]
 model = "Qwen/Qwen2.5-0.5B-Instruct"

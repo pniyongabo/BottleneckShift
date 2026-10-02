@@ -64,9 +64,9 @@ which are recorded in manifests.
    already notes that streamed chunks can hold several tokens, so an ITL is not a
    per-token decode step. Check the reconstruction against vLLM's own end-to-end
    latency. vLLM writes `median_e2el_ms` only when `e2el` is included in
-   `--percentile-metrics`, and the runner does not pass that flag (the default is
-   `ttft,tpot,itl`). This needs an opt-in config field with a test, so the
-   historical and controlled command plans stay unchanged.
+   `--percentile-metrics`; the controlled configs set
+   `execution.percentile_metrics` to include it, and `analysis/compare.py` reports it
+   as `vllm_median_e2el_ms` next to the reconstructed `e2el_ms`.
 
 **Deliverables:** two validated raw series and checksums; one comparison figure; a
 short report stating replicated effects, changed effects, uncertainty, and remaining

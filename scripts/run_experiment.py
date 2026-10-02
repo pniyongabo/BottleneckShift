@@ -56,6 +56,8 @@ def benchmark_command(config: dict, max_concurrency: int, output_dir: Path,
         command += ["--temperature", str(sampling["temperature"])]
     if "top_p" in sampling:
         command += ["--top-p", str(sampling["top_p"])]
+    if "percentile_metrics" in config["execution"]:
+        command += ["--percentile-metrics", ",".join(config["execution"]["percentile_metrics"])]
     return command
 
 
@@ -164,6 +166,7 @@ def main() -> int:
         "tokenizer_revision": config["server"].get("tokenizer_revision", "unresolved"),
         "generation_config": config["server"].get("generation_config", "vllm_default"),
         "sampling": config.get("sampling", "vllm_benchmark_defaults"),
+        "percentile_metrics": config["execution"].get("percentile_metrics", "vllm_default"),
         "warmup_concurrencies": config["execution"].get(
             "warmup_concurrencies", [config["execution"]["warmup_max_concurrency"]]),
     }

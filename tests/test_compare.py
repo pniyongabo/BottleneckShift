@@ -25,6 +25,7 @@ def test_summary_derives_tpot_and_e2el_and_counts_only_real_errors(tmp_path):
         "errors": ["", "", "Connection reset"],
         "request_throughput": 5.0,
         "output_throughput": 20.0,
+        "median_e2el_ms": 201.5,
     }
     row = compare.summarize(write_result(tmp_path, document))
     assert row["errors"] == 1
@@ -32,6 +33,7 @@ def test_summary_derives_tpot_and_e2el_and_counts_only_real_errors(tmp_path):
     assert row["tpot_ms"] == pytest.approx(20.0)
     assert row["e2el_ms"] == pytest.approx(200.0)
     assert row["itl_ms"] == pytest.approx(20.0)
+    assert row["vllm_median_e2el_ms"] == 201.5
 
 
 def test_summary_reports_zero_errors_when_all_requests_succeed(tmp_path):

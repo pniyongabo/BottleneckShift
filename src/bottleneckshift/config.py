@@ -42,6 +42,12 @@ def load_config(path: Path) -> dict:
             raise ValueError("execution.warmup_concurrencies must contain positive values")
         if len(warmup_concurrencies) != len(set(warmup_concurrencies)):
             raise ValueError("execution.warmup_concurrencies must be unique")
+    percentile_metrics = config["execution"].get("percentile_metrics")
+    if percentile_metrics is not None:
+        if not percentile_metrics or not set(percentile_metrics) <= {"ttft", "tpot", "itl", "e2el"}:
+            raise ValueError("execution.percentile_metrics must list ttft, tpot, itl, or e2el")
+        if len(percentile_metrics) != len(set(percentile_metrics)):
+            raise ValueError("execution.percentile_metrics must be unique")
     server = config["server"]
     for key in ("model_revision", "tokenizer_revision"):
         if key in server and not str(server[key]).strip():

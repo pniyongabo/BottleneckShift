@@ -26,6 +26,7 @@ def historical_benchmark(concurrency, directory, prompts):
 def controlled_config():
     config = load_config(Path("configs/milestone1-forward.toml"))
     config["execution"]["warmup_concurrencies"] = [1, 8]
+    config["execution"]["percentile_metrics"] = ["ttft", "tpot", "itl", "e2el"]
     config["server"].update({"model_revision": "a" * 40, "tokenizer_revision": "b" * 40,
                              "enable_prefix_caching": False, "generation_config": "vllm"})
     config["sampling"] = {"temperature": 0.0, "top_p": 1.0}
@@ -54,7 +55,8 @@ def test_protocol_controls_become_vllm_flags(tmp_path):
     config["server"]["enable_prefix_caching"] = True
     assert run_experiment.server_command(config)[-1] == "--enable-prefix-caching"
     command = run_experiment.benchmark_command(config, 8, tmp_path)
-    assert command[-4:] == ["--temperature", "0.0", "--top-p", "1.0"]
+    assert command[-6:] == ["--temperature", "0.0", "--top-p", "1.0",
+                            "--percentile-metrics", "ttft,tpot,itl,e2el"]
 
 
 def test_warmup_concurrencies_create_labelled_warmups(tmp_path):
@@ -99,7 +101,7 @@ def test_protocol_controls_are_recorded_in_series_and_run_manifests(tmp_path, mo
     root = tmp_path / "runs" / "synthetic"
     manifest = json.loads((root / "manifest.json").read_text())
     expected = {"prefix_caching": False, "model_revision": "a" * 40, "tokenizer_revision": "b" * 40,
-                "generation_config": "vllm_default", "sampling": {"temperature": 0.0, "top_p": 1.0},
+                "generation_config": "vllm_default", "percentile_metrics": "vllm_default", "sampling": {"temperature": 0.0, "top_p": 1.0},
                 "warmup_concurrencies": [1, 8]}
     assert manifest["schema_version"] == 3 and manifest["status"] == "complete"
     assert manifest["protocol_controls"] == expected
