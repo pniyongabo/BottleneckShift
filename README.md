@@ -51,7 +51,7 @@ metadata, package inventory, and best-effort GPU inventory.
 
 | Stage | Factor | Conditions | Status |
 |---|---|---|---|
-| 1 | Workload concurrency | 1 vs 8, fixed generated token targets | **Implemented; not executed here** |
+| 1 | Workload concurrency | 1 vs 8, fixed generated token targets | **Completed; [reviewed report](reports/milestone1-20261001T205137Z.md)** |
 | 2 | Workload shape | short/long input and output factorial | Planned |
 | 3 | Network | controlled latency/bandwidth/loss shaping | Planned |
 | 4 | Host contention | controlled CPU and memory pressure | Planned |
@@ -135,6 +135,48 @@ python analysis/compare.py results/runs --output results/figures/milestone1.svg
 The analysis refuses to invent missing observations. It prints a series-labelled,
 run-level CSV summary and, when valid measured results exist, makes a figure showing
 repetition-level distributions rather than presenting a single run as definitive.
+It also reports request counts and realized input/output-token ranges. Before analysis,
+validate complete extracted series against their manifests:
+
+```bash
+python scripts/validate_results.py \
+  results/runs/milestone1-20261001T205137Z-forward \
+  results/runs/milestone1-20261001T205137Z-reverse
+```
+
+This command requires the raw result directories; they are intentionally not in this
+repository. The retained historical archive was unavailable while integrating the
+report. On October 2, 2026, the archive custodian reported running this command on
+both extracted series: all 12 measured runs and 1,200 measured requests passed with
+zero failures and exact configured token lengths. This is a reported external
+validation run, not a rerun performed from this checkout; see the report for its
+scope and the checks that remain dependent on the retained archive.
+
+### Controls for the next protocol
+
+The historical configs remain unchanged. A newly reviewed config can control the
+cache, warm both workload levels, pin model assets, and make sampling explicit:
+
+```toml
+[execution]
+warmup_prompts = 10
+warmup_max_concurrency = 1 # retained for compatibility
+warmup_concurrencies = [1, 8]
+cooldown_seconds = 15
+
+[server]
+# ...the existing server fields...
+model_revision = "IMMUTABLE_COMMIT_ID"
+tokenizer_revision = "IMMUTABLE_COMMIT_ID"
+enable_prefix_caching = false
+
+[sampling]
+temperature = 0.0
+top_p = 1.0
+```
+
+Replace the placeholders with reviewed immutable revisions; do not run them as-is.
+These values are passed to the vLLM CLIs and copied into both series and run manifests.
 
 ## Repository layout
 
@@ -144,11 +186,12 @@ repetition-level distributions rather than presenting a single run as definitive
 * `analysis/` — transparent post-processing of raw JSON.
 * `experiments/` — hypotheses and protocols written before running.
 * `results/` — retention policy and ignored local run artifacts.
-* `report/` — future study narrative (currently only a scope note).
+* `reports/` — reviewed experiment reports and artifact provenance.
 
 ## Limitations and validity threats
 
-No GPU benchmark results ship with this milestone. Generated prompts improve
+No raw GPU benchmark results ship with this milestone; the reviewed findings and
+external archive record are published in the milestone report. Generated prompts improve
 repeatability but are not representative of all applications. Tokenizer behavior can
 make realized lengths differ from targets. A single model/GPU/framework combination
 limits external validity. Client and server on one host remove network realism and

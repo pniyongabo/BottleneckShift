@@ -31,3 +31,10 @@ report and alongside the archived results.
 The intervention supports statements about this workload setting on this system.
 GPU/CPU utilization may help explain a signature but cannot establish causation.
 Network, host, and GPU contention have not been manipulated in this milestone.
+
+## Outcome
+
+The experiment has been completed. The reviewed findings, validation provenance,
+measurements, limitations, and retained-archive checksum are published in the
+[Milestone 1 report](../reports/milestone1-20261001T205137Z.md). Raw artifacts remain
+external and are not part of this repository.
