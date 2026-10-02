@@ -7,3 +7,5 @@ __pycache__/
 results/runs/
 results/figures/
 *.log
+.DS_Store
+results/archives/
