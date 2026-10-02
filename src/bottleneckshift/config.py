@@ -36,4 +36,21 @@ def load_config(path: Path) -> dict:
     for item in conditions:
         if item.get("max_concurrency", 0) < 1:
             raise ValueError("condition max_concurrency must be positive")
+    warmup_concurrencies = config["execution"].get("warmup_concurrencies")
+    if warmup_concurrencies is not None:
+        if not warmup_concurrencies or any(value < 1 for value in warmup_concurrencies):
+            raise ValueError("execution.warmup_concurrencies must contain positive values")
+        if len(warmup_concurrencies) != len(set(warmup_concurrencies)):
+            raise ValueError("execution.warmup_concurrencies must be unique")
+    server = config["server"]
+    for key in ("model_revision", "tokenizer_revision"):
+        if key in server and not str(server[key]).strip():
+            raise ValueError(f"server.{key} cannot be empty")
+    if "enable_prefix_caching" in server and not isinstance(server["enable_prefix_caching"], bool):
+        raise ValueError("server.enable_prefix_caching must be a boolean")
+    sampling = config.get("sampling", {})
+    if sampling.get("temperature", 0) < 0:
+        raise ValueError("sampling.temperature cannot be negative")
+    if "top_p" in sampling and not 0 < sampling["top_p"] <= 1:
+        raise ValueError("sampling.top_p must be in (0, 1]")
     return config

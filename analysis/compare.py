@@ -56,6 +56,11 @@ def summarize(path: Path) -> dict:
     errors = document.get("errors")
     # vLLM records one entry per request; successful requests have an empty string.
     row["errors"] = sum(1 for error in errors if error) if isinstance(errors, list) else document.get("failed", 0)
+    row["requests"] = len(document.get("ttfts", []))
+    row["input_tokens_min"] = min(document.get("input_lens", []), default=None)
+    row["input_tokens_max"] = max(document.get("input_lens", []), default=None)
+    row["output_tokens_min"] = min(document.get("output_lens", []), default=None)
+    row["output_tokens_max"] = max(document.get("output_lens", []), default=None)
     return row
 
 
@@ -96,7 +101,7 @@ def main() -> int:
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args()
     paths = sorted(path for path in args.results_dir.glob("**/requests.json")
-                   if path.parent.name != "warmup")
+                   if "warmup" not in path.parts)
     if not paths:
         parser.error(f"no requests.json files found below {args.results_dir}")
     rows = [summarize(path) for path in paths]

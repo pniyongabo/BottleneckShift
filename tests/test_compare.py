@@ -37,3 +37,11 @@ def test_summary_derives_tpot_and_e2el_and_counts_only_real_errors(tmp_path):
 def test_summary_reports_zero_errors_when_all_requests_succeed(tmp_path):
     document = {"ttfts": [0.1], "itls": [[0.01]], "output_lens": [2], "errors": [""]}
     assert compare.summarize(write_result(tmp_path, document))["errors"] == 0
+
+
+def test_summary_reports_token_ranges(tmp_path):
+    document = {"ttfts": [0.1, 0.2], "itls": [[], []], "input_lens": [3, 4],
+                "output_lens": [2, 5], "errors": ["", ""]}
+    row = compare.summarize(write_result(tmp_path, document))
+    assert (row["input_tokens_min"], row["input_tokens_max"]) == (3, 4)
+    assert (row["output_tokens_min"], row["output_tokens_max"]) == (2, 5)

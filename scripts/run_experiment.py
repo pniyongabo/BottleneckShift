@@ -26,21 +26,35 @@ SERIES_ID_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,79}$")
 
 def server_command(config: dict) -> list[str]:
     server = config["server"]
-    return ["vllm", "serve", server["model"], "--host", server["host"], "--port", str(server["port"]),
+    command = ["vllm", "serve", server["model"], "--host", server["host"], "--port", str(server["port"]),
             "--tensor-parallel-size", str(server["tensor_parallel_size"]),
             "--gpu-memory-utilization", str(server["gpu_memory_utilization"])]
+    if "model_revision" in server:
+        command += ["--revision", str(server["model_revision"])]
+    if "tokenizer_revision" in server:
+        command += ["--tokenizer-revision", str(server["tokenizer_revision"])]
+    if "enable_prefix_caching" in server:
+        command.append("--enable-prefix-caching" if server["enable_prefix_caching"]
+                       else "--no-enable-prefix-caching")
+    return command
 
 
 def benchmark_command(config: dict, max_concurrency: int, output_dir: Path,
                       num_prompts: int | None = None) -> list[str]:
     server, workload = config["server"], config["workload"]
-    return ["vllm", "bench", "serve", "--backend", "vllm", "--model", server["model"],
+    command = ["vllm", "bench", "serve", "--backend", "vllm", "--model", server["model"],
             "--host", server["host"], "--port", str(server["port"]), "--dataset-name", "random",
             "--random-input-len", str(workload["input_tokens"]), "--random-output-len", str(workload["output_tokens"]),
             "--num-prompts", str(num_prompts if num_prompts is not None else workload["num_prompts"]),
             "--seed", str(workload["seed"]), "--request-rate", "inf",
             "--max-concurrency", str(max_concurrency), "--save-result", "--save-detailed",
             "--result-dir", str(output_dir), "--result-filename", "requests.json"]
+    sampling = config.get("sampling", {})
+    if "temperature" in sampling:
+        command += ["--temperature", str(sampling["temperature"])]
+    if "top_p" in sampling:
+        command += ["--top-p", str(sampling["top_p"])]
+    return command
 
 
 def build_plan(config: dict, root: Path) -> list[dict]:
@@ -48,11 +62,13 @@ def build_plan(config: dict, root: Path) -> list[dict]:
     plan = []
     execution = config["execution"]
     if execution["warmup_prompts"]:
-        directory = root / "warmup"
-        plan.append({"measurement_role": "warmup", "condition": "warmup", "repetition": None,
-                     "max_concurrency": execution["warmup_max_concurrency"], "directory": directory,
-                     "command": benchmark_command(config, execution["warmup_max_concurrency"], directory,
-                                                  execution["warmup_prompts"])})
+        concurrencies = execution.get("warmup_concurrencies", [execution["warmup_max_concurrency"]])
+        for concurrency in concurrencies:
+            directory = root / "warmup" / f"c{concurrency}"
+            plan.append({"measurement_role": "warmup", "condition": f"warmup_c{concurrency}",
+                         "repetition": None, "max_concurrency": concurrency, "directory": directory,
+                         "command": benchmark_command(config, concurrency, directory,
+                                                      execution["warmup_prompts"])})
     for condition in config["condition"]:
         for repetition in range(1, config["experiment"]["repetitions"] + 1):
             directory = root / condition["name"] / f"rep-{repetition:02d}"
@@ -136,10 +152,19 @@ def main() -> int:
 
     root.mkdir(parents=True, exist_ok=False)
     (root / "config.toml").write_bytes(args.config.read_bytes())
-    manifest = {"schema_version": 2, "series_id": series_id,
+    protocol_controls = {
+        "prefix_caching": config["server"].get("enable_prefix_caching", "vllm_default"),
+        "model_revision": config["server"].get("model_revision", "unresolved"),
+        "tokenizer_revision": config["server"].get("tokenizer_revision", "unresolved"),
+        "sampling": config.get("sampling", "vllm_benchmark_defaults"),
+        "warmup_concurrencies": config["execution"].get(
+            "warmup_concurrencies", [config["execution"]["warmup_max_concurrency"]]),
+    }
+    manifest = {"schema_version": 3, "series_id": series_id,
                 "plan_name": config["experiment"]["name"], "status": "planned",
                 "condition_order": [item["name"] for item in config["condition"]],
                 "warmup_enabled": bool(config["execution"]["warmup_prompts"]),
+                "protocol_controls": protocol_controls,
                 "active_run": None, "config": config, "server_command": server_command(config),
                 "environment": environment(REPO), "preflight": checks, "runs": []}
     manifest_path = root / "manifest.json"
@@ -164,6 +189,7 @@ def main() -> int:
                     "repetition": item["repetition"], "max_concurrency": item["max_concurrency"],
                     "requested_input_tokens": config["workload"]["input_tokens"],
                     "requested_output_tokens": config["workload"]["output_tokens"],
+                    "protocol_controls": protocol_controls,
                     "command": item["command"], "started_at_utc": started,
                     "finished_at_utc": datetime.now(timezone.utc).isoformat(),
                     "returncode": completed.returncode, "raw_result": str(item["directory"] / "requests.json")}
