@@ -1,0 +1,45 @@
+# Controlled follow-up to milestone 1 (reverse). The historical milestone1-*.toml
+# configs and series IDs are preserved unchanged; use new series IDs with this plan.
+[experiment]
+name = "milestone1-controlled-reverse"
+repetitions = 3
+
+[execution]
+warmup_prompts = 10
+warmup_max_concurrency = 1 # retained for compatibility
+warmup_concurrencies = [1, 8]
+cooldown_seconds = 15
+
+[server]
+model = "Qwen/Qwen2.5-0.5B-Instruct"
+# Hugging Face commit resolved from main on 2026-10-01 (last modified 2024-09-25).
+model_revision = "7ae557604adf67be50417f59c2c2f167def9a775"
+tokenizer_revision = "7ae557604adf67be50417f59c2c2f167def9a775"
+# Disabled so repeated seed-2027 prompts cannot reuse KV cache across runs.
+enable_prefix_caching = false
+# Ignore the model generation_config.json defaults (repetition_penalty 1.1, top_k 20).
+generation_config = "vllm"
+host = "127.0.0.1"
+port = 8000
+tensor_parallel_size = 1
+gpu_memory_utilization = 0.90
+startup_timeout_seconds = 600
+
+[workload]
+num_prompts = 100
+input_tokens = 256
+output_tokens = 128
+seed = 2027
+
+[sampling]
+# Greedy decoding; top_p is recorded explicitly although greedy ignores it.
+temperature = 0.0
+top_p = 1.0
+
+[[condition]]
+name = "perturbation_c8"
+max_concurrency = 8
+
+[[condition]]
+name = "baseline_c1"
+max_concurrency = 1
