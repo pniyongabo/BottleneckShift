@@ -146,7 +146,11 @@ python scripts/validate_results.py \
 
 This command requires the raw result directories; they are intentionally not in this
 repository. The retained historical archive was unavailable while integrating the
-report, so this validation remains an explicit follow-up rather than a claimed rerun.
+report. On October 2, 2026, the archive custodian reported running this command on
+both extracted series: all 12 measured runs and 1,200 measured requests passed with
+zero failures and exact configured token lengths. This is a reported external
+validation run, not a rerun performed from this checkout; see the report for its
+scope and the checks that remain dependent on the retained archive.
 
 ### Controls for the next protocol
 
