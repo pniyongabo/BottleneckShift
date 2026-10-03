@@ -2,9 +2,10 @@
 
 **Drafted October 2, 2026**
 **Reviewed state:** `main` at `20602610df9e30401c1d193ae668c5b6d55c0a48`
+**Updated October 3, 2026:** Milestone 2 completed.
 
-This is a plan, not a result. Each milestone needs a reviewed protocol and configs
-before any measured run.
+This is a plan, not a result; completed milestones link to their reports. Each
+milestone needs a reviewed protocol and configs before any measured run.
 
 ## Starting point
 
@@ -26,9 +27,17 @@ the Milestone 1 report, and the controlled configs
 `configs/milestone1-controlled-forward.toml` and
 `configs/milestone1-controlled-reverse.toml`. These pin the model and tokenizer
 revision, disable prefix caching, set explicit sampling and generation behavior, and
-warm both concurrency levels. They have **not yet produced a reported measured pair**.
+warm both concurrency levels. They produced the Milestone 2 pair, reported in
+[`reports/milestone2-20261003T034456Z.md`](../reports/milestone2-20261003T034456Z.md).
 
 ## Milestone 2 — Confirm the concurrency result under explicit controls
+
+**Status: completed October 3, 2026** — [report](../reports/milestone2-20261003T034456Z.md). Pair
+`milestone2-20261003T034456Z`: 1,200 measured requests validated. C8 gives ~6.5×
+output throughput at ~18% higher median E2E latency in both orders; forward and
+reverse agree within 0.1% except C8 TTFT. Relative to Milestone 1, C8 TTFT is 21–42%
+higher; TPOT is 3–4% lower and throughput 2–4% higher. Reconstructed E2E matches
+vLLM's own within 0.001 ms. The plan below is kept as executed.
 
 **Question:** Which Milestone 1 effects persist when cache and generation behavior
 are controlled?
@@ -203,7 +212,7 @@ start. Its Milestone 3 data are a pilot, not a substitute for the full study.
 
 ## Priority, budget, and final artifact
 
-Finish Milestone 2, then make Milestone 3 the core contribution. Milestone 4 is
+Milestone 2 is complete; make Milestone 3 the core contribution. Milestone 4 is
 optional. Milestones 5–9 are beyond the current budget.
 
 Planned effort is roughly 27–40 focused hours: 4–6 for Milestone 2, 15–22 for

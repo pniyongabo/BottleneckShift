@@ -52,7 +52,7 @@ metadata, package inventory, and best-effort GPU inventory.
 | Milestone | Question | Status |
 |---|---|---|
 | 1 | Workload concurrency: 1 vs 8, fixed generated token targets (cache-enabled) | **Completed; [reviewed report](reports/milestone1-20261001T205137Z.md)** |
-| 2 | Does the milestone 1 effect persist under explicit cache and sampling controls? | Configs merged; awaiting measured pair |
+| 2 | Does the milestone 1 effect persist under explicit cache and sampling controls? | **Completed; [reviewed report](reports/milestone2-20261003T034456Z.md)** |
 | 3 | Prefill- vs decode-heavy regimes at C1/C8, plus one contention intervention | Planned |
 | 4 | Adaptive backend selection, only if milestone 3 finds distinguishable states | Optional |
 | 5 | Workload shape: short/long input and output factorial | Planned |
@@ -159,7 +159,8 @@ scope and the checks that remain dependent on the retained archive.
 
 ### Controlled follow-up protocol
 
-This is the milestone 2 protocol.
+This is the milestone 2 protocol; its measured pair is reported in
+[`reports/milestone2-20261003T034456Z.md`](reports/milestone2-20261003T034456Z.md).
 The historical configs remain unchanged. The reviewed follow-up plans
 `configs/milestone1-controlled-forward.toml` and
 `configs/milestone1-controlled-reverse.toml` keep the milestone 1 model, workload,
@@ -201,8 +202,8 @@ python scripts/run_experiment.py --config configs/milestone1-controlled-forward.
 
 ## Limitations and validity threats
 
-No raw GPU benchmark results ship with this milestone; the reviewed findings and
-external archive record are published in the milestone report. Generated prompts improve
+No raw GPU benchmark results ship with this repository; the reviewed findings and
+external archive records are published in the milestone reports. Generated prompts improve
 repeatability but are not representative of all applications. Tokenizer behavior can
 make realized lengths differ from targets. A single model/GPU/framework combination
 limits external validity. Client and server on one host remove network realism and
@@ -212,15 +213,20 @@ alter scheduling and benchmark schemas, hence the dependency pin and raw retenti
 
 ## Staged plan (40–50 focused hours total)
 
-1. **Baseline + concurrency perturbation (this repository state):** reproducible
-   runner, manifests, raw retention, and comparison plot.
-2. **Workload-shape study:** pre-register a small factorial design and validate
-   measurement stability.
-3. **One contention factor at a time:** add network, host, then GPU perturbations
-   with negative controls and server-side corroboration.
-4. **Bottleneck shifts:** run only motivated crossed conditions and reason from
-   metric signatures, not utilization alone.
-5. **Synthesis:** uncertainty-aware plots, limitations, and a concise report.
+The [roadmap](experiments/roadmap.md) is the source of truth for milestone scope,
+status, and effort; the experimental matrix above summarizes it.
+
+1. **Milestone 1 (completed):** reproducible runner, manifests, raw retention, and the
+   cache-enabled concurrency baseline.
+2. **Milestone 2 (completed):** the concurrency comparison repeated under explicit
+   cache, sampling, model-revision, and warm-up controls.
+3. **Milestone 3 (next, core contribution):** prefill- vs decode-heavy regimes at C1/C8
+   plus one contention intervention, with server-side corroboration and pre-registered
+   signatures.
+4. **Milestone 4 (optional):** adaptive backend selection, only if milestone 3 finds
+   distinguishable states.
+5. **Milestones 5–9 (beyond the current budget):** full workload-shape, network, host,
+   and GPU contention studies, then motivated crossed conditions.
 
 This scope deliberately excludes Kubernetes, distributed deployment, dashboards,
 databases, a custom load generator, and an adaptive router.
