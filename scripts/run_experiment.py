@@ -300,6 +300,9 @@ def preflight(config: dict, root: Path) -> dict:
     checks["results_writable"] = {"ok": bool(parent and os.access(parent, os.W_OK)), "detail": str(parent)}
     try:
         with socket.socket() as probe:
+            # SO_REUSEADDR, as servers use: TIME_WAIT sockets left by the previous series'
+            # connections must not block, but a live listener still fails the bind.
+            probe.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
             probe.bind((host, port))
         checks["server_port_available"] = {"ok": True, "detail": f"{host}:{port}"}
     except OSError as exc:

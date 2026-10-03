@@ -213,6 +213,15 @@ conditions, prompt counts, and predicted signatures are unchanged.
    - Whether to use contention, and at what intensity, remain Phase C addendum
      decisions.
 
+## Outcome
+
+**Phase B completed October 3, 2026:** pair `milestone3-20261003T180358Z`, 1,800
+measured requests validated. Decode dominates E2E latency in both regimes, so the
+pre-registered shift (pre-first-token dominance in `prefill_heavy`) did not occur.
+C8 does amplify different components: queueing, prefill, and the ITL tail in
+`prefill_heavy`, and only decode (+10%) in `decode_heavy`. See the
+[Phase B report](../reports/milestone3-20261003T180358Z-phase-b.md). Phase C is next and needs its addendum committed first.
+
 ## Deliverables and acceptance
 
 **Deliverables:** this protocol and the Phase C addendum, the configs, validated raw

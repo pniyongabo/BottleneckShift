@@ -53,7 +53,7 @@ metadata, package inventory, and best-effort GPU inventory.
 |---|---|---|
 | 1 | Workload concurrency: 1 vs 8, fixed generated token targets (cache-enabled) | **Completed; [reviewed report](reports/milestone1-20261001T205137Z.md)** |
 | 2 | Does the milestone 1 effect persist under explicit cache and sampling controls? | **Completed; [reviewed report](reports/milestone2-20261003T034456Z.md)** |
-| 3 | Prefill- vs decode-heavy regimes at C1/C8, plus one contention intervention | Next; [protocol](experiments/milestone3.md) (Phase B pre-registered; Phase A tooling implemented) |
+| 3 | Prefill- vs decode-heavy regimes at C1/C8, plus one contention intervention | In progress; [protocol](experiments/milestone3.md); **Phase B completed, [report](reports/milestone3-20261003T180358Z-phase-b.md)**; Phase C next |
 | 4 | Adaptive backend selection, only if milestone 3 finds distinguishable states | Optional |
 | 5 | Workload shape: short/long input and output factorial | Planned |
 | 6 | Network: controlled latency/bandwidth/loss shaping | Planned |
@@ -243,6 +243,7 @@ python analysis/phases.py results/runs/SERIES-ID [...] \
 * `experiments/` — hypotheses and protocols written before running.
 * `results/` — retention policy and ignored local run artifacts.
 * `reports/` — reviewed experiment reports and artifact provenance.
+* `docs/` — working notes, e.g. the [milestone workflow](docs/milestone-workflow.md).
 
 ## Limitations and validity threats
 
@@ -264,9 +265,9 @@ status, and effort; the experimental matrix above summarizes it.
    cache-enabled concurrency baseline.
 2. **Milestone 2 (completed):** the concurrency comparison repeated under explicit
    cache, sampling, model-revision, and warm-up controls.
-3. **Milestone 3 (next, core contribution):** prefill- vs decode-heavy regimes at C1/C8
-   plus one contention intervention, with server-side corroboration and pre-registered
-   signatures.
+3. **Milestone 3 (in progress, core contribution):** prefill- vs decode-heavy regimes at
+   C1/C8 (Phase B completed) plus one contention intervention (Phase C next), with
+   server-side corroboration and pre-registered signatures.
 4. **Milestone 4 (optional):** adaptive backend selection, only if milestone 3 finds
    distinguishable states.
 5. **Milestones 5–9 (beyond the current budget):** full workload-shape, network, host,

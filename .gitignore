@@ -9,3 +9,4 @@ results/figures/
 *.log
 .DS_Store
 results/archives/
+external/

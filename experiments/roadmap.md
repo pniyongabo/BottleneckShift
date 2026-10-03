@@ -48,9 +48,12 @@ vLLM's own within 0.001 ms.
 
 ## Milestone 3 — Diagnose one bottleneck shift
 
-**Status: next; Phase B pre-registered October 3, 2026; Phase A tooling implemented
-(awaiting GPU shakedown).** Protocol:
-[`experiments/milestone3.md`](milestone3.md).
+**Status: in progress. Phase B completed October 3, 2026
+([report](../reports/milestone3-20261003T180358Z-phase-b.md)); Phase C next.** Protocol: [`experiments/milestone3.md`](milestone3.md).
+
+Phase B result: decode dominates E2E latency in both regimes, so the pre-registered
+shift did not occur. In `prefill_heavy`, C8 raises the pre-first-token share from
+~31% to ~45%, adds ~61 ms of queueing, and widens the ITL tail tenfold.
 
 **Question:** Under which workload conditions does the dominant source of
 client-visible delay change, and what measurements distinguish the causes?
