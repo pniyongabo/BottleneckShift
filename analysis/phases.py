@@ -49,6 +49,11 @@ def order_of(manifest: dict) -> str:
     return "-".join(manifest["condition_order"])
 
 
+def contention_of(manifest: dict) -> str:
+    table = manifest["config"].get("contention", {"mode": "off"})
+    return f"active-{table['duty_cycle']:g}" if table["mode"] == "active" else table["mode"]
+
+
 def client_means(document: dict) -> dict:
     requests = compare.successful_requests(document)
     ttft = sum(request["ttft"] for request in requests)
@@ -92,7 +97,7 @@ def run_rows(root: Path) -> list[dict]:
         document = json.loads((directory / "requests.json").read_text())
         client = compare.summarize(directory / "requests.json")
         row = {"series_id": manifest["series_id"], "regime": regime_of(manifest), "order": order_of(manifest),
-               "condition": run["condition"], "max_concurrency": run["max_concurrency"],
+               "contention": contention_of(manifest), "condition": run["condition"], "max_concurrency": run["max_concurrency"],
                "repetition": run["repetition"],
                **{key: client[key] for key in ("requests", "ttft_ms", "tpot_ms", "e2el_ms", "itl_ms",
                                                "vllm_median_e2el_ms", "output_token_throughput")},
@@ -114,12 +119,17 @@ def run_rows(root: Path) -> list[dict]:
 
 
 def summarize(rows: list[dict]) -> list[dict]:
+    # One cell per series and condition, so repeated designs (e.g. contention off before
+    # and after) stay separate; series order follows the input.
     groups = {}
     for row in rows:
-        groups.setdefault((row["regime"], row["order"], row["condition"]), []).append(row)
+        groups.setdefault((row["series_id"], row["condition"]), []).append(row)
     summary = []
-    for (regime, order, condition), group in sorted(groups.items()):
-        entry = {"regime": regime, "order": order, "condition": condition, "repetitions": len(group)}
+    for (series_id, condition), group in groups.items():
+        first = group[0]
+        entry = {"series_id": series_id, "regime": first["regime"], "order": first["order"],
+                 "contention": first["contention"], "condition": condition,
+                 "max_concurrency": first["max_concurrency"], "repetitions": len(group)}
         for metric in SUMMARY_METRICS:
             values = [row[metric] for row in group if row.get(metric) is not None]
             entry[f"{metric}_median"] = statistics.median(values) if values else None

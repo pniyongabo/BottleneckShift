@@ -117,3 +117,27 @@ def test_request_id_prefix_must_be_boolean(tmp_path):
     path.write_text(source.replace("cooldown_seconds = 15", 'cooldown_seconds = 15\nrequest_id_prefix = "yes"'))
     with pytest.raises(ValueError, match="request_id_prefix"):
         load_config(path)
+
+
+def test_phase_c_configs_match_the_addendum():
+    base = load_config(Path("configs/milestone3-prefill_heavy-forward.toml"))
+    forward = load_config(Path("configs/milestone3-crossover-forward.toml"))
+    reverse = load_config(Path("configs/milestone3-crossover-reverse.toml"))
+    for config in (forward, reverse):
+        for key in ("server", "workload", "sampling", "telemetry"):
+            assert config[key] == base[key]
+        assert config["execution"] == {**base["execution"], "warmup_prompts": 32,
+                                       "warmup_concurrencies": [8, 16, 32]}
+        assert "contention" not in config
+    assert [(c["name"], c["max_concurrency"]) for c in forward["condition"]] == [
+        ("anchor_c8", 8), ("probe_c16", 16), ("probe_c32", 32)]
+    assert list(reversed(forward["condition"])) == reverse["condition"]
+    expected = {"sham": {"mode": "sham", "memory_cap_mib": 1024},
+                "active-025": {"mode": "active", "duty_cycle": 0.25, "memory_cap_mib": 1024},
+                "active-050": {"mode": "active", "duty_cycle": 0.5, "memory_cap_mib": 1024}}
+    for label, table in expected.items():
+        config = load_config(Path(f"configs/milestone3-contention-{label}.toml"))
+        assert config["contention"] == table
+        assert config["experiment"]["name"] == f"milestone3-contention-{label}-prefill_heavy-forward"
+        for key in ("server", "workload", "sampling", "telemetry", "execution", "condition"):
+            assert config[key] == base[key]

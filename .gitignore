@@ -10,3 +10,4 @@ results/figures/
 .DS_Store
 results/archives/
 external/
+.claude/
