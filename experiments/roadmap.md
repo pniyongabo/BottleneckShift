@@ -48,7 +48,8 @@ vLLM's own within 0.001 ms.
 
 ## Milestone 3 — Diagnose one bottleneck shift
 
-**Status: next; Phase B pre-registered October 3, 2026.** Protocol:
+**Status: next; Phase B pre-registered October 3, 2026; Phase A tooling implemented
+(awaiting GPU shakedown).** Protocol:
 [`experiments/milestone3.md`](milestone3.md).
 
 **Question:** Under which workload conditions does the dominant source of

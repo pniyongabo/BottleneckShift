@@ -173,7 +173,45 @@ schedule.
 
 ## Amendments
 
-None.
+### 2026-10-03 — Phase A measurement details (before any Milestone 3 data)
+
+These refine how Phase A measures, as the status banner allows. Phase B's regimes,
+conditions, prompt counts, and predicted signatures are unchanged.
+
+1. **Sampler commands.** GPU: the command above, run with `TZ=UTC` so timestamps are
+   UTC. CPU: `mpstat -P ALL 1` with `LC_ALL=C S_TIME_FORMAT=ISO TZ=UTC`, adding per-CPU
+   rows so that saturation of a single client core is visible on the 4-vCPU host.
+   The host needs `apt install sysstat`.
+2. **Server-side attribution.** Each run's server timings are histogram deltas
+   between a scrape taken just before the run and one taken after the server
+   settles (no running or waiting requests, and an unchanged request count across two
+   scrapes). Validation requires every per-request family's count delta to equal the
+   run's prompt count. vLLM 0.29.0's `vllm bench serve` sends no extra requests by
+   default (`--ready-check-timeout-sec 0`, `--num-warmups 0`). The per-token ITL
+   histogram is reported, not count-checked.
+3. **Request-ID prefix.** `--request-id-prefix <series>-<condition>-[rep-NN-]` provides
+   client-side traceability only. Prometheus histograms carry no request IDs, and
+   `--enable-log-requests` is not enabled: it is not a Milestone 2 control and it
+   writes prompts to the log. Server records are attributed by scrape bracketing.
+4. **Definitions.**
+   - Client pre-first-token share = Σ TTFT / Σ E2E over a run's successful requests.
+   - Server share = (queue + prefill) / (queue + inference), from per-run means.
+   - Dominant component = pre-first-token if mean queue + prefill > mean decode,
+     otherwise decode.
+   - Telemetry run window = [finish − vLLM's `duration`, finish], so client startup
+     is excluded.
+5. **Validation.** Warm-ups are validated automatically. Telemetry must cover the
+   series with no gap over 1 s (GPU) or 3 s (CPU). A sampler that exits early, or a
+   failed scrape, fails the series.
+6. **Contention tooling (for Phase C).**
+   - `memory_cap_mib` bounds the generator's total VRAM, including its CUDA context
+     (512 MiB reserved). It is checked with `nvidia-smi --query-compute-apps`.
+   - The default fp16 matrix is 2048×2048, and the duty cycle is fixed-time within
+     each period (default 100 ms).
+   - Achieved duty must be within ±0.05 of the configured value.
+   - Sham allocates the same memory but runs zero steps.
+   - Whether to use contention, and at what intensity, remain Phase C addendum
+     decisions.
 
 ## Deliverables and acceptance
 

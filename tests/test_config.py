@@ -69,3 +69,51 @@ def test_percentile_metrics_are_validated(tmp_path, value, message):
     path.write_text(source.replace("cooldown_seconds = 15", f"cooldown_seconds = 15\npercentile_metrics = {value!r}".replace("'", '"')))
     with pytest.raises(ValueError, match=message):
         load_config(path)
+
+
+PHASE_B = {"prefill_heavy": (2048, 32, 100), "decode_heavy": (64, 512, 50)}
+
+
+def test_phase_b_configs_match_the_protocol_and_milestone_2_controls():
+    controlled = load_config(Path("configs/milestone1-controlled-forward.toml"))
+    for regime, (inputs, outputs, prompts) in PHASE_B.items():
+        forward = load_config(Path(f"configs/milestone3-{regime}-forward.toml"))
+        reverse = load_config(Path(f"configs/milestone3-{regime}-reverse.toml"))
+        for key in ("server", "workload", "execution", "sampling", "telemetry"):
+            assert forward[key] == reverse[key]
+        assert list(reversed(forward["condition"])) == reverse["condition"] == list(reversed(controlled["condition"]))
+        assert forward["experiment"] == {"name": f"milestone3-{regime}-forward", "repetitions": 3}
+        assert forward["server"] == controlled["server"] and forward["sampling"] == controlled["sampling"]
+        assert forward["execution"] == {**controlled["execution"], "request_id_prefix": True}
+        assert forward["workload"] == {"num_prompts": prompts, "input_tokens": inputs,
+                                       "output_tokens": outputs, "seed": 2027}
+        assert forward["telemetry"] == {"server_metrics": True, "gpu_sampler": True, "cpu_sampler": True}
+        assert "contention" not in forward
+
+
+@pytest.mark.parametrize("extra, message", [
+    ('\n[telemetry]\ngpu_sample = true\n', "unknown \\[telemetry\\]"),
+    ('\n[telemetry]\ngpu_sampler = 1\n', "booleans"),
+    ('\n[telemetry]\ngpu_sampler = true\n[contention]\nmode = "loud"\n', "contention.mode"),
+    ('\n[telemetry]\ngpu_sampler = true\n[contention]\nmode = "active"\nmemory_cap_mib = 1024\n', "duty_cycle"),
+    ('\n[telemetry]\ngpu_sampler = true\n[contention]\nmode = "sham"\nduty_cycle = 0.5\nmemory_cap_mib = 1024\n',
+     "not allowed in sham"),
+    ('\n[telemetry]\ngpu_sampler = true\n[contention]\nmode = "sham"\nmemory_cap_mib = 2048\n', "memory_cap_mib"),
+    ('\n[telemetry]\ngpu_sampler = true\n[contention]\nmode = "sham"\nmemory_cap_mib = 600\nmatrix_size = 8192\n',
+     "does not fit"),
+    ('\n[contention]\nmode = "sham"\nmemory_cap_mib = 1024\n', "requires telemetry.gpu_sampler"),
+    ('\n[contention]\nmode = "off"\nduty_cycle = 0.5\n', "takes no other settings"),
+])
+def test_instrumentation_settings_are_validated(tmp_path, extra, message):
+    path = tmp_path / "bad.toml"
+    path.write_text(Path("configs/milestone1-forward.toml").read_text() + extra)
+    with pytest.raises(ValueError, match=message):
+        load_config(path)
+
+
+def test_request_id_prefix_must_be_boolean(tmp_path):
+    path = tmp_path / "bad.toml"
+    source = Path("configs/milestone1-forward.toml").read_text()
+    path.write_text(source.replace("cooldown_seconds = 15", 'cooldown_seconds = 15\nrequest_id_prefix = "yes"'))
+    with pytest.raises(ValueError, match="request_id_prefix"):
+        load_config(path)
