@@ -2,7 +2,8 @@
 
 **Drafted October 2, 2026**
 **Reviewed state:** `main` at `20602610df9e30401c1d193ae668c5b6d55c0a48`
-**Updated October 3, 2026:** Milestone 2 completed.
+**Updated October 3, 2026:** Milestone 2 completed; per-milestone protocols moved to
+`experiments/milestoneN.md`.
 
 This is a plan, not a result; completed milestones link to their reports. Each
 milestone needs a reviewed protocol and configs before any measured run.
@@ -32,116 +33,40 @@ warm both concurrency levels. They produced the Milestone 2 pair, reported in
 
 ## Milestone 2 — Confirm the concurrency result under explicit controls
 
-**Status: completed October 3, 2026** — [report](../reports/milestone2-20261003T034456Z.md). Pair
-`milestone2-20261003T034456Z`: 1,200 measured requests validated. C8 gives ~6.5×
-output throughput at ~18% higher median E2E latency in both orders; forward and
-reverse agree within 0.1% except C8 TTFT. Relative to Milestone 1, C8 TTFT is 21–42%
-higher; TPOT is 3–4% lower and throughput 2–4% higher. Reconstructed E2E matches
-vLLM's own within 0.001 ms. The plan below is kept as executed.
+**Status: completed October 3, 2026.** Protocol:
+[`experiments/milestone2.md`](milestone2.md). Report:
+[`reports/milestone2-20261003T034456Z.md`](../reports/milestone2-20261003T034456Z.md).
 
 **Question:** Which Milestone 1 effects persist when cache and generation behavior
 are controlled?
 
-Milestone 2 runs the merged `milestone1-controlled-*` configs. They keep their names,
-which are recorded in manifests.
-
-**Work**
-
-1. Review the exact commands from both controlled configs; freeze the commit, GPU
-   setup, and configs.
-2. Run both series on one stable GPU instance, with fresh series IDs and the same
-   host. Preserve warm-ups, server logs, raw JSON, and any failed requests. The runner
-   stops a series on a nonzero benchmark exit, and the validator rejects any
-   non-empty error string. A series with failed requests is therefore recorded and
-   reported, not analyzed as valid.
-3. Validate before analysis:
-   * archive checksum with `shasum -a 256 -c`, separately from the validator;
-   * manifest completeness, return codes, error strings, array lengths, and realized
-     token lengths with `scripts/validate_results.py`;
-   * warm-ups separately, because the validator checks only measured runs: apply
-     `validate_result` from `src/bottleneckshift/validation.py` to each
-     `warmup/c*/requests.json`, as was done for the Milestone 1 archive.
-
-   Compare repetitions and execution orders. Keep anomalous observations, including
-   the historical reverse C8 outlier.
-4. Compare controlled results with the historical pair as **different protocols**.
-   Report changes in TTFT, TPOT, end-to-end latency, and output throughput without
-   pooling their repetitions.
-5. Audit request timing before making fine-grained phase claims.
-   `analysis/compare.py` reconstructs end-to-end latency as TTFT plus summed
-   inter-token intervals, ending at the last streamed chunk. The Milestone 1 report
-   already notes that streamed chunks can hold several tokens, so an ITL is not a
-   per-token decode step. Check the reconstruction against vLLM's own end-to-end
-   latency. vLLM writes `median_e2el_ms` only when `e2el` is included in
-   `--percentile-metrics`; the controlled configs set
-   `execution.percentile_metrics` to include it, and `analysis/compare.py` reports it
-   as `vllm_median_e2el_ms` next to the reconstructed `e2el_ms`.
-
-**Deliverables:** two validated raw series and checksums; one comparison figure; a
-short report stating replicated effects, changed effects, uncertainty, and remaining
-confounders.
-
-**Acceptance:** both series complete, all measured requests validate, and each
-reported number traces to raw results and a fixed protocol. A mismatch with
-Milestone 1 is a result to explain, not grounds to discard the run.
-
-**Effort:** approximately 4–6 focused hours after GPU setup.
+Pair `milestone2-20261003T034456Z`: 1,200 measured requests validated. C8 gives ~6.5×
+output throughput at ~18% higher median E2E latency in both orders; forward and
+reverse agree within 0.1% except C8 TTFT. Relative to Milestone 1, C8 TTFT is 21–42%
+higher; TPOT is 3–4% lower and throughput 2–4% higher. Reconstructed E2E matches
+vLLM's own within 0.001 ms.
 
 ## Milestone 3 — Diagnose one bottleneck shift
+
+**Status: next; Phase B pre-registered October 3, 2026.** Protocol:
+[`experiments/milestone3.md`](milestone3.md).
 
 **Question:** Under which workload conditions does the dominant source of
 client-visible delay change, and what measurements distinguish the causes?
 
-**Design**
-
-1. Pre-register two contrasting workload regimes: a longer-input/shorter-output case
-   emphasizing prefill and a shorter-input/longer-output case emphasizing decode. Run
-   each at C1 and C8, with the Milestone 2 model, GPU, framework, cache policy, and
-   sampling controls held fixed.
-2. Select **one** contention intervention after baseline data indicates an
-   informative regime. Host CPU contention is a candidate only if client and server
-   effects can be separated; use process-level measurements or isolate the client.
-   GPU contention or network shaping can replace it if the setup affords a cleaner
-   intervention. Do not run a broad grid of all factors.
-3. State predicted signatures before collection: which of TTFT, inter-token timing,
-   queue/processing time, throughput, and resource counters should move, and which
-   should remain stable? Include a negative control or recovery baseline.
-4. Collect timestamped client and server measurements and resource telemetry.
-   Repeat and vary order. Match intervals and request IDs where the instrumentation
-   allows it. Treat utilization and counters as corroboration, not proof of cause.
-5. Run a small set of crossed conditions only where the single-factor results
-   motivate them. Present the transition in a figure that shows latency
-   contributions, throughput, and supporting telemetry together.
-
-**Tooling prerequisites** (gaps in the current code; implement with tests before
-collection):
-
-* **Per-condition workload.** `benchmark_command` in `scripts/run_experiment.py` reads
-  one `[workload]` table per config; conditions vary only `max_concurrency`. Either
-  use one config per regime or add an optional per-condition workload override.
-* **Server-side timing.** Nothing server-side is captured yet. Scrape vLLM's
-  Prometheus `/metrics` endpoint before and after each run, covering
-  `vllm:request_queue_time_seconds`, `vllm:request_prefill_time_seconds`, and
-  `vllm:request_decode_time_seconds`, and store the scrapes next to `requests.json`.
-* **Resource telemetry.** Add a sidecar sampler (`nvidia-smi --query-gpu=… -lms`,
-  `pidstat`/`mpstat`) whose output files are listed in the run manifest.
-* **Request matching.** `vllm bench serve --request-id-prefix` exists in 0.29.0, and
-  `requests.json` includes `start_times`. Use them to align client requests with
-  server logs and telemetry intervals.
-* **Host constraint.** The Milestone 1 host had 4 vCPUs, with client and server on
-  the same host. CPU contention there needs `taskset` pinning of client, server, and
-  stressor, or a separate client host. Otherwise prefer GPU contention or network
-  shaping.
-
-**Deliverables:** reviewed protocol and configs; validated raw data; two or three
-figures; a technical note identifying supported attribution, competing explanations,
-measurement overhead, and limits of the single-GPU setup.
+**Outline:** (A) tooling: `/metrics` scrapes, GPU and CPU telemetry, request-ID
+matching, analysis, and validation; (B) two pre-registered workload regimes,
+prefill-heavy (2048/32, 100 prompts) and decode-heavy (64/512, 50 prompts), each at
+C1 and C8 in both orders, with Milestone 2's controls; (C) one contention
+intervention, chosen after Phase B and pre-registered in an addendum, with sham and
+recovery controls. GPU contention is preferred, and Phase A builds its load
+generator; CPU contention is unsuitable on the 4-vCPU host.
 
 **Acceptance:** the report names at least one regime transition with an
 intervention, a predicted signature, observed evidence, and a plausible
 falsification check. If attribution remains ambiguous, report that clearly.
 
-**Effort:** approximately 15–22 focused hours, including the tooling prerequisites.
+**Effort:** approximately 15–22 focused hours, including the tooling.
 
 ## Milestone 4 — Test adaptation only if Milestone 3 supports it
 
@@ -196,7 +121,8 @@ metrics, telemetry, request matching). None is scheduled within the current budg
 Notes for planning:
 
 * **Milestone 5** generalizes Milestone 3's two regimes into a full factorial; it
-  needs the per-condition workload support listed under Milestone 3.
+  one config per cell (as in Milestone 3) works for a small factorial, but a larger
+  one needs an optional per-condition workload override in the runner.
 * **Milestone 6** needs the client off the server host, or shaping applied to a
   network path the client actually uses; loopback shaping on one host is not
   representative.
