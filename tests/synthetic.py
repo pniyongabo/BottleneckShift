@@ -66,7 +66,8 @@ def requests_document(prompts: int, input_tokens: int, output_tokens: int, *, tt
     e2el = ttft + itl * (output_tokens - 1)
     return {"ttfts": [ttft] * prompts, "itls": intervals, "input_lens": [input_tokens] * prompts,
             "output_lens": [output_tokens] * prompts, "errors": [""] * prompts,
-            "duration": e2el * prompts, "median_e2el_ms": e2el * 1000,
+            # At least 2 s so the run window always holds a 1 s mpstat sample.
+            "duration": max(e2el * prompts, 2.0), "median_e2el_ms": e2el * 1000,
             "request_throughput": 1 / e2el, "output_throughput": output_tokens / e2el}
 
 
