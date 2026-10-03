@@ -5,9 +5,15 @@ import json
 from pathlib import Path
 import sys
 
+import matplotlib
 import pytest
 
 from synthetic import run_series, small_config
+
+# Import pyplot (which may build matplotlib's font cache with real subprocesses) before
+# any test monkeypatches subprocess.run.
+matplotlib.use("Agg")
+import matplotlib.pyplot  # noqa: E402,F401
 
 _spec = importlib.util.spec_from_file_location("run_experiment", Path("scripts/run_experiment.py"))
 run_experiment = importlib.util.module_from_spec(_spec)

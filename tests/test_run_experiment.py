@@ -199,3 +199,25 @@ def test_missing_metric_family_fails_before_any_warmup(tmp_path, monkeypatch):
         run_series(tmp_path, monkeypatch, run_experiment, source)
     manifest = json.loads((tmp_path / "runs" / "synthetic" / "manifest.json").read_text())
     assert manifest["status"] == "failed" and manifest["runs"] == []
+
+
+def test_preflight_port_check_fails_only_for_a_live_listener(tmp_path):
+    import socket
+    with socket.socket() as listener:
+        listener.bind(("127.0.0.1", 0))
+        listener.listen()
+        port = listener.getsockname()[1]
+        config = {"server": {"host": "127.0.0.1", "port": port}}
+        assert not run_experiment.preflight(config, tmp_path / "s")["checks"]["server_port_available"]["ok"]
+    # A closed port with a just-finished connection (TIME_WAIT) is available again.
+    with socket.socket() as server:
+        server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        server.bind(("127.0.0.1", 0))
+        server.listen()
+        port = server.getsockname()[1]
+        client = socket.create_connection(("127.0.0.1", port))
+        connection, _ = server.accept()
+        connection.close()  # server side closes first and enters TIME_WAIT
+        client.close()
+    config = {"server": {"host": "127.0.0.1", "port": port}}
+    assert run_experiment.preflight(config, tmp_path / "s")["checks"]["server_port_available"]["ok"]
