@@ -53,7 +53,7 @@ metadata, package inventory, and best-effort GPU inventory.
 |---|---|---|
 | 1 | Workload concurrency: 1 vs 8, fixed generated token targets (cache-enabled) | **Completed; [reviewed report](reports/milestone1-20261001T205137Z.md)** |
 | 2 | Does the milestone 1 effect persist under explicit cache and sampling controls? | **Completed; [reviewed report](reports/milestone2-20261003T034456Z.md)** |
-| 3 | Prefill- vs decode-heavy regimes at C1/C8, plus one contention intervention | Planned |
+| 3 | Prefill- vs decode-heavy regimes at C1/C8, plus one contention intervention | Next; [protocol](experiments/milestone3.md) (Phase B pre-registered) |
 | 4 | Adaptive backend selection, only if milestone 3 finds distinguishable states | Optional |
 | 5 | Workload shape: short/long input and output factorial | Planned |
 | 6 | Network: controlled latency/bandwidth/loss shaping | Planned |
