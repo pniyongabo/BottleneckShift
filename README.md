@@ -53,7 +53,7 @@ metadata, package inventory, and best-effort GPU inventory.
 |---|---|---|
 | 1 | Workload concurrency: 1 vs 8, fixed generated token targets (cache-enabled) | **Completed; [reviewed report](reports/milestone1-20261001T205137Z.md)** |
 | 2 | Does the milestone 1 effect persist under explicit cache and sampling controls? | **Completed; [reviewed report](reports/milestone2-20261003T034456Z.md)** |
-| 3 | Prefill- vs decode-heavy regimes at C1/C8, plus one contention intervention | Next; [protocol](experiments/milestone3.md) (Phase B pre-registered) |
+| 3 | Prefill- vs decode-heavy regimes at C1/C8, plus one contention intervention | Next; [protocol](experiments/milestone3.md) (Phase B pre-registered; Phase A tooling implemented) |
 | 4 | Adaptive backend selection, only if milestone 3 finds distinguishable states | Optional |
 | 5 | Workload shape: short/long input and output factorial | Planned |
 | 6 | Network: controlled latency/bandwidth/loss shaping | Planned |
@@ -85,6 +85,8 @@ python -m pip install --upgrade pip
 python -m pip install -r requirements.txt
 python -m pip install -e '.[test]'
 ```
+
+The `test` extra includes matplotlib, used by the Milestone 3 figure test.
 
 Review the full forward execution plan without requiring vLLM or a GPU:
 
@@ -190,12 +192,54 @@ python scripts/run_experiment.py --config configs/milestone1-controlled-forward.
   --series-id DEVICE-MODEL-controlled-forward-01 --dry-run
 ```
 
+### Milestone 3 instrumentation
+
+Milestone 3 adds opt-in instrumentation. Configs without these settings, including
+every milestone 1 and 2 config, produce byte-identical command plans. The Phase B
+configs are `configs/milestone3-{prefill_heavy,decode_heavy}-{forward,reverse}.toml`.
+See [`experiments/milestone3.md`](experiments/milestone3.md) for the protocol and its
+amendments.
+
+```toml
+[execution]
+request_id_prefix = true   # --request-id-prefix <series>-<condition>-[rep-NN-]
+
+[telemetry]
+server_metrics = true      # /metrics before each run and after the server settles
+gpu_sampler = true         # nvidia-smi every 200 ms -> gpu.csv
+cpu_sampler = true         # mpstat -P ALL 1 -> cpu.txt (apt install sysstat)
+
+[contention]               # Phase C only; requires gpu_sampler
+mode = "active"            # off | sham | active
+duty_cycle = 0.5           # active only
+memory_cap_mib = 1024      # total generator VRAM, including its CUDA context
+```
+
+Instrumented series write manifest schema 4. Next to each `requests.json` the runner
+writes `metrics-before.prom` and `metrics-after.prom`. At series level it writes
+`metrics-initial.prom`, `gpu.csv`, `cpu.txt`, and, with contention,
+`contention.jsonl`. `scripts/validate_results.py` additionally checks warm-ups, that
+the server's request count equals each run's prompt count, telemetry coverage, and the
+contention log.
+
+Analyze validated series with:
+
+```bash
+python -m pip install -e '.[analysis]'   # matplotlib, for the figure
+python analysis/phases.py results/runs/SERIES-ID [...] \
+  --summary results/figures/milestone3-summary.csv --output results/figures/milestone3.svg
+```
+
+`scripts/gpu_contention.py` can also be run by hand during a disposable shakedown.
+
 ## Repository layout
 
 * `configs/` — reviewed experiment inputs.
 * `scripts/` — thin orchestration around the official vLLM CLI.
-* `src/bottleneckshift/` — config validation and manifest capture.
-* `analysis/` — transparent post-processing of raw JSON.
+* `src/bottleneckshift/` — config validation, manifest capture, result validation, and
+  Milestone 3 parsers (Prometheus, telemetry) and contention logic.
+* `analysis/` — transparent post-processing of raw JSON (`compare.py`; `phases.py` for
+  Milestone 3).
 * `experiments/` — hypotheses and protocols written before running.
 * `results/` — retention policy and ignored local run artifacts.
 * `reports/` — reviewed experiment reports and artifact provenance.

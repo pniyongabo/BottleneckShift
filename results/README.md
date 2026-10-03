@@ -18,6 +18,18 @@ figure, plus the figure and a provenance note. Never commit model weights, cache
 large traces, secrets, machine credentials, or identifying host metadata. Store large
 artifacts in a versioned external archive and commit its checksum and durable locator.
 
+Milestone 3 series (manifest schema 4) may also contain `metrics-initial.prom`, per-run
+`metrics-before.prom`/`metrics-after.prom`, `gpu.csv`, `cpu.txt`, and
+`contention.jsonl`. For these series the validator also checks:
+
+* warm-ups;
+* that each run's server request count delta equals its prompt count;
+* that telemetry covers the series without gaps;
+* the contention log.
+
+Before publishing anything, check that these files carry no identifying data:
+`cpu.txt` starts with the hostname, and manifests record the GPU UUID and host paths.
+
 No example or synthetic benchmark result is included. If one is added for tests or
 documentation, its filename and surrounding text must explicitly say `synthetic` and
 it must never be presented as a measured finding.

@@ -4,6 +4,8 @@
 
 - Do not commit, push, or open pull requests without asking the maintainer first.
   Make the change, run the checks, report the result, and wait for approval.
+- Keep a unit of work in one pull request: its implementation, tests, and the docs it
+  affects (README, roadmap, protocol) go together rather than in separate PRs.
 
 ## Documentation
 

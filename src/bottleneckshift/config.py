@@ -3,6 +3,13 @@
 from pathlib import Path
 import tomllib
 
+from bottleneckshift import contention
+
+TELEMETRY_KEYS = ("server_metrics", "gpu_sampler", "cpu_sampler")
+CONTENTION_KEYS = ("mode", "duty_cycle", "period_ms", "memory_cap_mib", "matrix_size",
+                   "ready_timeout_seconds")
+MAX_CONTENTION_MIB = 1024
+
 
 def load_config(path: Path) -> dict:
     with path.open("rb") as handle:
@@ -56,9 +63,52 @@ def load_config(path: Path) -> dict:
         raise ValueError("server.generation_config cannot be empty")
     if "enable_prefix_caching" in server and not isinstance(server["enable_prefix_caching"], bool):
         raise ValueError("server.enable_prefix_caching must be a boolean")
+    if not isinstance(config["execution"].get("request_id_prefix", False), bool):
+        raise ValueError("execution.request_id_prefix must be a boolean")
+    telemetry = config.get("telemetry", {})
+    unknown = set(telemetry) - set(TELEMETRY_KEYS)
+    if unknown:
+        raise ValueError(f"unknown [telemetry] keys: {sorted(unknown)}")
+    if any(not isinstance(value, bool) for value in telemetry.values()):
+        raise ValueError("[telemetry] values must be booleans")
+    _validate_contention(config.get("contention"), telemetry)
     sampling = config.get("sampling", {})
     if sampling.get("temperature", 0) < 0:
         raise ValueError("sampling.temperature cannot be negative")
     if "top_p" in sampling and not 0 < sampling["top_p"] <= 1:
         raise ValueError("sampling.top_p must be in (0, 1]")
     return config
+
+
+def _validate_contention(table: dict | None, telemetry: dict) -> None:
+    if table is None:
+        return
+    unknown = set(table) - set(CONTENTION_KEYS)
+    if unknown:
+        raise ValueError(f"unknown [contention] keys: {sorted(unknown)}")
+    mode = table.get("mode")
+    if mode not in contention.MODES:
+        raise ValueError(f"contention.mode must be one of {contention.MODES}")
+    if mode == "off":
+        if set(table) - {"mode"}:
+            raise ValueError("contention mode 'off' takes no other settings")
+        return
+    if mode == "active":
+        duty = table.get("duty_cycle")
+        if not isinstance(duty, (int, float)) or not 0 < duty <= 1:
+            raise ValueError("contention.duty_cycle must be in (0, 1] for active mode")
+    elif "duty_cycle" in table:
+        raise ValueError("contention.duty_cycle is not allowed in sham mode")
+    if not 10 <= table.get("period_ms", 100) <= 1000:
+        raise ValueError("contention.period_ms must be in [10, 1000]")
+    cap = table.get("memory_cap_mib")
+    if not isinstance(cap, int) or not contention.CONTEXT_RESERVE_MIB < cap <= MAX_CONTENTION_MIB:
+        raise ValueError(f"contention.memory_cap_mib must be an integer in "
+                         f"({contention.CONTEXT_RESERVE_MIB}, {MAX_CONTENTION_MIB}]")
+    size = table.get("matrix_size", contention.DEFAULT_MATRIX_SIZE)
+    if contention.buffer_bytes(size) > contention.tensor_budget_bytes(cap):
+        raise ValueError("contention.matrix_size does not fit within memory_cap_mib")
+    if table.get("ready_timeout_seconds", 120) <= 0:
+        raise ValueError("contention.ready_timeout_seconds must be positive")
+    if not telemetry.get("gpu_sampler"):
+        raise ValueError("contention requires telemetry.gpu_sampler = true")
