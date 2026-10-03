@@ -30,9 +30,12 @@ class CudaBackend:
         self.torch = torch
         torch.cuda.init()
         free, total = torch.cuda.mem_get_info()
-        if free < memory_cap_mib * contention.MIB + 256 * contention.MIB:
-            raise RuntimeError(f"only {free // contention.MIB} MiB free; cap is {memory_cap_mib} MiB")
+        # The CUDA context already exists here and counts toward the cap, so only the
+        # tensor budget (cap minus the context reserve) must still fit, with a margin.
         budget = contention.tensor_budget_bytes(memory_cap_mib)
+        if free < budget + 64 * contention.MIB:
+            raise RuntimeError(f"only {free // contention.MIB} MiB free; tensors need "
+                               f"{budget // contention.MIB} MiB (cap {memory_cap_mib} MiB)")
         torch.cuda.set_per_process_memory_fraction(min(1.0, (budget + 64 * contention.MIB) / total))
         shape = (matrix_size, matrix_size)
         self.a = torch.randn(shape, device="cuda", dtype=torch.float16)

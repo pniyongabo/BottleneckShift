@@ -96,3 +96,32 @@ def test_cli_writes_start_ready_window_stop_with_fake_backend(tmp_path, monkeypa
     assert [event["event"] for event in events] == ["start", "ready", "window", "stop"]
     assert events[0]["matrix_size"] == 2048 and events[0]["device_name"] == "fake"
     assert contention.validate_log(events, "active", 0.5)["achieved_duty"] == 0.5
+
+
+def fake_torch(free_mib, total_mib=15352):
+    import types
+    allocated = []
+    cuda = types.SimpleNamespace(
+        init=lambda: None, mem_get_info=lambda: (free_mib * contention.MIB, total_mib * contention.MIB),
+        set_per_process_memory_fraction=lambda fraction: allocated.append(("fraction", fraction)),
+        get_device_name=lambda index: "fake", memory_allocated=lambda: 0,
+        Event=lambda **kwargs: types.SimpleNamespace(record=lambda: None, synchronize=lambda: None,
+                                                     elapsed_time=lambda other: 1.0))
+    def tensor(*args, **kwargs):
+        allocated.append(("tensor", args))
+        return object()
+    return types.SimpleNamespace(cuda=cuda, randn=tensor, empty=tensor, matmul=lambda *a, **k: None,
+                                 float16="fp16", uint8="u8", __version__="fake"), allocated
+
+
+@pytest.mark.parametrize("free_mib, fits", [(612, True), (575, False)])
+def test_cuda_backend_checks_only_the_tensor_budget_after_context_creation(monkeypatch, free_mib, fits):
+    # Seen on the A4000 next to vLLM at 0.90: 612 MiB free after the generator's own context.
+    torch, allocated = fake_torch(free_mib)
+    monkeypatch.setitem(__import__("sys").modules, "torch", torch)
+    if fits:
+        backend = gpu_contention.CudaBackend(2048, 1024)
+        assert backend.info["ballast_bytes"] == (512 - 24) * contention.MIB
+    else:
+        with pytest.raises(RuntimeError, match="tensors need 512 MiB"):
+            gpu_contention.CudaBackend(2048, 1024)
