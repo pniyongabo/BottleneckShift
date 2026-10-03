@@ -48,13 +48,21 @@ vLLM's own within 0.001 ms.
 
 ## Milestone 3 — Diagnose one bottleneck shift
 
-**Status: in progress. Phase B completed October 3, 2026
-([report](../reports/milestone3-20261003T180358Z-phase-b.md)); Phase C pre-registered
-(crossover probe at C16/C32, then GPU contention at duty 0.25 and 0.5 with sham and recovery).** Protocol: [`experiments/milestone3.md`](milestone3.md).
+**Status: completed October 3, 2026.** Protocol:
+[`experiments/milestone3.md`](milestone3.md). Reports:
+[Phase B](../reports/milestone3-20261003T180358Z-phase-b.md),
+[Phase C](../reports/milestone3-20261003T201214Z-phase-c.md).
 
-Phase B result: decode dominates E2E latency in both regimes, so the pre-registered
-shift did not occur. In `prefill_heavy`, C8 raises the pre-first-token share from
-~31% to ~45%, adds ~61 ms of queueing, and widens the ITL tail tenfold.
+- **Phase B:** decode dominates E2E latency in both regimes, so the pre-registered
+  shift did not occur.
+- **Phase C crossover probe:** past C8 the pre-first-token share *falls*
+  (0.44 → 0.24 at C32). Throughput peaks at C16, and the cost moves into per-step
+  time (ITL p50 4.9 → 55 ms), consistent with chunked prefill inflating generation
+  steps.
+- **Phase C contention:** GPU contention has a distinct signature: C1 slows too,
+  queue time stays flat, prefill slows more than decode, and the front end is
+  unaffected.
+- **Carried forward:** a pre-registered per-step (ITL) test of the saturation shift.
 
 **Question:** Under which workload conditions does the dominant source of
 client-visible delay change, and what measurements distinguish the causes?

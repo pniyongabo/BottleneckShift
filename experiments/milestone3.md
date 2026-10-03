@@ -314,6 +314,19 @@ C8 does amplify different components: queueing, prefill, and the ITL tail in
 `prefill_heavy`, and only decode (+10%) in `decode_heavy`. See the
 [Phase B report](../reports/milestone3-20261003T180358Z-phase-b.md). Phase C is next and needs its addendum committed first.
 
+**Phase C completed October 3, 2026:** session `milestone3c-20261003T201214Z`, 4,800
+measured requests validated.
+
+- **Crossover probe:** the primary prediction failed in the opposite direction. The
+  pre-first-token share fell (0.44 → 0.35 → 0.24 at C8, C16, C32). Throughput peaked
+  at C16, and the added latency moved into per-step time (ITL p50 4.9 → 55 ms).
+- **GPU contention:** almost all predictions held. Sham and recovery matched the
+  baseline; there was a monotonic dose response; prefill slowed more than decode;
+  queue stayed flat; the front end was unaffected.
+
+See the [Phase C report](../reports/milestone3-20261003T201214Z-phase-c.md). **Milestone 3 is complete.** The bottleneck-shift
+question is carried forward with a per-step metric.
+
 ## Deliverables and acceptance
 
 **Deliverables:** this protocol and the Phase C addendum, the configs, validated raw
