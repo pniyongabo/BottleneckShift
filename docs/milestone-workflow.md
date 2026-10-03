@@ -3,7 +3,8 @@
 Written October 3, 2026, after Milestones 1–3 Phase B (October 1–3). It summarizes the
 loop each milestone went through, where the time went, and the adjustments now
 adopted. The rules themselves live in [`AGENTS.md`](../AGENTS.md); this file explains
-them.
+them. The step-by-step procedure, with host-script and report templates, is kept as a
+local, untracked agent skill for now.
 
 ## The loop we repeated
 
@@ -85,30 +86,20 @@ Each milestone went through the same seven stages.
 7. **Docs move together.** A status change updates the README matrix and staged plan,
    the roadmap, and the protocol's outcome in the same PR.
 
-## Next adjustments (proposed)
+## Further adjustments
 
-- **Commit the host scripts.** Move `setup.sh`, `run.sh`, and `archive.sh` into
-  `scripts/host/`, parameterized by config list and commit. Each milestone's plan then
-  becomes a list of configs and a pair-ID prefix, not new scripts.
-- **A report skeleton.** A `reports/TEMPLATE.md` with the standing sections:
-  - result;
-  - provenance and protocol;
-  - validation;
-  - measurements;
-  - predictions vs observed;
-  - interpretation;
-  - limitations;
-  - execution notes;
-  - next step;
-  - artifact record.
+Done:
 
-  Analysis output could fill the measurement table directly.
-- **A one-command local verification.** For example, `scripts/verify_archive.sh
-  ARCHIVE`: checksum, extract, validate, and run analysis into `analysis/`.
-- **Resume support in `run.sh`.** Skip series that already validated, so an
-  interrupted pair continues without a hand-written `run-rest.sh`.
-- **A lighter roadmap.** Keep milestone summaries to a few lines, and let protocols and
-  reports carry the detail.
+- **Reusable host scripts** (`setup`, `run` with resume, `archive`) and a **report
+  template** now live with the local agent skill (untracked for now). A milestone's run
+  plan becomes a commit plus a list of series and configs.
+
+Still proposed:
+
+- **A one-command local verification**, such as `scripts/verify_archive.sh ARCHIVE`:
+  checksum, extract, validate, and run analysis into `analysis/`.
+- **A lighter roadmap**: keep milestone summaries to a few lines, and let protocols
+  and reports carry the detail.
 
 ## Per-milestone checklist (target)
 

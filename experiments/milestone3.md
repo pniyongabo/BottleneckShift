@@ -213,6 +213,98 @@ conditions, prompt counts, and predicted signatures are unchanged.
    - Whether to use contention, and at what intensity, remain Phase C addendum
      decisions.
 
+## Phase C addendum (pre-registered 2026-10-03, before any Phase C data)
+
+Phase B showed `prefill_heavy` at C8 moving toward a crossover (pre-first-token share
+31% → 45%, ~61 ms queueing, ITL p99 10×) without reaching one. Phase C therefore has
+two parts, run in one GPU session in this order. All Milestone 2 controls and the
+Phase A instrumentation are unchanged. The protocol's single intervention is
+contention (part 2). The crossover probe (part 1) extends Phase B's workload axis
+and was added because of the Phase B result; it is labeled that way in the report.
+
+### Part 1 — crossover probe (concurrency)
+
+* **Configs:** `configs/milestone3-crossover-{forward,reverse}.toml`.
+* **Workload:** `prefill_heavy` (2048 input / 32 output tokens, 100 prompts per run).
+* **Conditions:** `anchor_c8` (concurrency 8, repeating the Phase B cell to link
+  sessions), `probe_c16`, and `probe_c32`. Forward order is C8, C16, C32; reverse is
+  C32, C16, C8.
+* **Repetitions and warm-ups:** three repetitions. Warm-ups of 32 prompts at each of
+  C8, C16, and C32, so every level is warmed at full concurrency.
+
+**Predictions:**
+
+1. **Primary.** The client pre-first-token share (Σ TTFT / Σ E2E) exceeds 0.5 at C16
+   or C32, so the dominant component becomes pre-first-token (mean server
+   queue + prefill > mean decode) for at least one of them.
+2. Server queue time grows faster than concurrency: at C32 it is more than 4× the
+   C8 queue time.
+3. TPOT stays at or above the C8 level (~8.3 ms), and ITL p99 stays above 40 ms.
+4. Output throughput gains little beyond C8: C32 is less than 1.5× C8.
+5. **Anchor.** C8 reproduces Phase B within 5% for E2E and throughput. A larger
+   difference is reported as a session effect.
+
+**Falsification.** If the share stays at or below 0.5 at C32, the crossover is not
+reached at this workload and concurrency range. That outcome is reported as is; no
+further levels are added within Phase C.
+
+### Part 2 — GPU contention
+
+* **Cell:** the Phase B `prefill_heavy` design (C1 and C8, three repetitions, forward
+  order), so each contention series is directly comparable to Phase B.
+* **Series, in this order:**
+  1. `off-before`: `configs/milestone3-prefill_heavy-forward.toml`, unchanged.
+  2. `sham`: the generator holds its CUDA context and full memory footprint but runs
+     no kernels.
+  3. `active-0.25`.
+  4. `active-0.50`.
+  5. `off-after`: the recovery baseline, using the same config as `off-before`.
+
+  Configs: `configs/milestone3-contention-{sham,active-025,active-050}.toml`.
+* **Generator:** fp16 2048×2048 matrix multiplies, a 100 ms period, and a
+  `memory_cap_mib` of 1024 covering the whole process, CUDA context included. It
+  starts after the server is healthy and before warm-ups.
+* **Validation per series:** achieved duty within ±0.05; generator VRAM at or below
+  the cap.
+
+**Predictions:**
+
+1. **Sham.** Within the `off-before` repetition range, or within 2% where the ranges
+   are tighter, on TTFT, TPOT, E2E, and throughput at both C1 and C8.
+2. **Dose response.** E2E, TTFT, and TPOT increase monotonically from off to 0.25 to
+   0.50 at both C1 and C8. Output throughput decreases monotonically.
+3. **Attribution (server side).** Both server prefill and decode times rise under
+   active contention, because time-slicing slows both phases. At C8, queue time rises
+   proportionally more than prefill time, because slower service amplifies queueing.
+4. **Front end unaffected.** The gap between client TTFT and server TTFT stays within
+   2 ms of `off-before`. The contention is on the GPU, not the CPU or HTTP path.
+5. **Utilization is not the detector.** Mean GPU utilization changes by less than
+   5 percentage points between `off-before` and `active-0.50`. The contention shows
+   up in the server phase times and the generator's achieved duty, not in the
+   `nvidia-smi` percentage.
+6. **Share (secondary, direction only).** At C8, the pre-first-token share rises
+   under active contention.
+7. **Recovery.** `off-after` returns to within 2% of `off-before` on E2E and
+   throughput at C1 and C8. Otherwise drift or residual effects are reported.
+
+**Falsification.**
+
+- If active contention produces no dose-dependent change, check `kernel_duty` in the
+  generator log. A low kernel duty means the generator did not compete; a high one
+  means the effect is absorbed. Report whichever applies.
+- If the sham changes latency beyond its tolerance, memory or context overhead alone
+  is a confound, and active results are compared against the sham rather than
+  `off-before`.
+
+### Session rules
+
+* Order: probe forward, probe reverse, then the five contention series.
+* Each series is validated as soon as it finishes.
+* A failed series is rerun under a new series ID. Completed series are kept, and
+  nothing is spliced.
+* Report sampler overhead as unmeasured unless time remains for one telemetry-off
+  `prefill_heavy` series at the end.
+
 ## Outcome
 
 **Phase B completed October 3, 2026:** pair `milestone3-20261003T180358Z`, 1,800

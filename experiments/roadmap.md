@@ -49,7 +49,8 @@ vLLM's own within 0.001 ms.
 ## Milestone 3 — Diagnose one bottleneck shift
 
 **Status: in progress. Phase B completed October 3, 2026
-([report](../reports/milestone3-20261003T180358Z-phase-b.md)); Phase C next.** Protocol: [`experiments/milestone3.md`](milestone3.md).
+([report](../reports/milestone3-20261003T180358Z-phase-b.md)); Phase C pre-registered
+(crossover probe at C16/C32, then GPU contention at duty 0.25 and 0.5 with sham and recovery).** Protocol: [`experiments/milestone3.md`](milestone3.md).
 
 Phase B result: decode dominates E2E latency in both regimes, so the pre-registered
 shift did not occur. In `prefill_heavy`, C8 raises the pre-first-token share from

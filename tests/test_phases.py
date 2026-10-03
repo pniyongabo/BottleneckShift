@@ -89,3 +89,18 @@ def test_analysis_refuses_an_invalid_series(tmp_path, monkeypatch):
     (root / "manifest.json").write_text(json.dumps(manifest))
     with pytest.raises(ValueError, match="not complete"):
         phases.run_rows(root)
+
+
+def test_summary_keeps_repeated_designs_separate_and_labels_contention(tmp_path, monkeypatch):
+    roots = []
+    for name, extra in (("off-before", ""), ("sham", '\n[contention]\nmode = "sham"\nmemory_cap_mib = 1024\n'),
+                        ("off-after", "")):
+        source = small_config(Path("configs/milestone3-prefill_heavy-forward.toml").read_text(), contention=extra)
+        (tmp_path / name).mkdir()
+        roots.append(run_series(tmp_path / name, monkeypatch, run_experiment, source, series_id=name))
+    rows = [row for root in roots for row in phases.run_rows(root)]
+    cells = phases.summarize(rows)
+    assert [(cell["series_id"], cell["contention"], cell["condition"]) for cell in cells] == [
+        ("off-before", "off", "baseline_c1"), ("off-before", "off", "perturbation_c8"),
+        ("sham", "sham", "baseline_c1"), ("sham", "sham", "perturbation_c8"),
+        ("off-after", "off", "baseline_c1"), ("off-after", "off", "perturbation_c8")]

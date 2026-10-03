@@ -1,0 +1,59 @@
+# Milestone 3 Phase C part 1, crossover probe (reverse); pre-registered in the Phase C
+# addendum of experiments/milestone3.md. prefill_heavy workload at C8 (anchor), C16, C32.
+[experiment]
+name = "milestone3-crossover-prefill_heavy-reverse"
+repetitions = 3
+
+[execution]
+warmup_prompts = 32
+warmup_max_concurrency = 1 # retained for compatibility
+warmup_concurrencies = [8, 16, 32]
+cooldown_seconds = 15
+# Save vLLM's own E2E latency so the reconstructed e2el_ms can be audited.
+percentile_metrics = ["ttft", "tpot", "itl", "e2el"]
+# Tag every benchmark request with <series>-<condition>-[rep-NN-].
+request_id_prefix = true
+
+[server]
+model = "Qwen/Qwen2.5-0.5B-Instruct"
+# Hugging Face commit resolved from main on 2026-10-01 (last modified 2024-09-25).
+model_revision = "7ae557604adf67be50417f59c2c2f167def9a775"
+tokenizer_revision = "7ae557604adf67be50417f59c2c2f167def9a775"
+# Disabled so repeated seed-2027 prompts cannot reuse KV cache across runs.
+enable_prefix_caching = false
+# Ignore the model generation_config.json defaults (repetition_penalty 1.1, top_k 20).
+generation_config = "vllm"
+host = "127.0.0.1"
+port = 8000
+tensor_parallel_size = 1
+gpu_memory_utilization = 0.90
+startup_timeout_seconds = 600
+
+[workload]
+num_prompts = 100
+input_tokens = 2048
+output_tokens = 32
+seed = 2027
+
+[telemetry]
+# /metrics scrapes around every invocation; GPU (200 ms) and CPU (1 s) samplers.
+server_metrics = true
+gpu_sampler = true
+cpu_sampler = true
+
+[sampling]
+# Greedy decoding; top_p is recorded explicitly although greedy ignores it.
+temperature = 0.0
+top_p = 1.0
+
+[[condition]]
+name = "probe_c32"
+max_concurrency = 32
+
+[[condition]]
+name = "probe_c16"
+max_concurrency = 16
+
+[[condition]]
+name = "anchor_c8"
+max_concurrency = 8
