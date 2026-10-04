@@ -13,7 +13,8 @@ workload, result, or conclusion.
 
 ## Start here
 
-**Status:** milestones 1–3 complete (October 1–3, 2026). Every result below comes from
+**Status:** milestones 1–2 and Milestone 3 Phases B–C complete (October 1–3, 2026);
+Phase D, a direct test of the per-step finding below, is pre-registered. Every result below comes from
 pre-registered predictions, validated raw data, and a retained archive with a published
 checksum. The reports score each prediction, including the ones that failed.
 
@@ -108,7 +109,7 @@ metadata, package inventory, and best-effort GPU inventory.
 |---|---|---|
 | 1 | Workload concurrency: 1 vs 8, fixed generated token targets (cache-enabled) | **Completed; [reviewed report](reports/milestone1-20261001T205137Z.md)** |
 | 2 | Does the milestone 1 effect persist under explicit cache and sampling controls? | **Completed; [reviewed report](reports/milestone2-20261003T034456Z.md)** |
-| 3 | Prefill- vs decode-heavy regimes at C1/C8, plus one contention intervention | **Completed; [protocol](experiments/milestone3.md); reports: [Phase B](reports/milestone3-20261003T180358Z-phase-b.md), [Phase C](reports/milestone3-20261003T201214Z-phase-c.md)** |
+| 3 | Prefill- vs decode-heavy regimes at C1/C8, plus one contention intervention | Phases B–C completed ([Phase B](reports/milestone3-20261003T180358Z-phase-b.md), [Phase C](reports/milestone3-20261003T201214Z-phase-c.md)); **Phase D pre-registered** ([protocol](experiments/milestone3.md)) |
 | 4 | Adaptive backend selection, only if milestone 3 finds distinguishable states | Optional |
 | 5 | Workload shape: short/long input and output factorial | Planned |
 | 6 | Network: controlled latency/bandwidth/loss shaping | Planned |
@@ -323,9 +324,10 @@ status, and effort; the experimental matrix above summarizes it.
    cache-enabled concurrency baseline.
 2. **Milestone 2 (completed):** the concurrency comparison repeated under explicit
    cache, sampling, model-revision, and warm-up controls.
-3. **Milestone 3 (completed, core contribution):** prefill- vs decode-heavy regimes at
-   C1/C8 (Phase B), a crossover probe at C16/C32, and GPU contention with sham and
-   recovery controls (Phase C), with server-side corroboration and pre-registered
+3. **Milestone 3 (core contribution; Phase D pre-registered):** prefill- vs decode-heavy
+   regimes at C1/C8 (Phase B), a crossover probe at C16/C32 and GPU contention with sham
+   and recovery controls (Phase C), and a per-step test with a scheduler token-budget
+   intervention (Phase D), all with server-side corroboration and pre-registered
    predictions.
 4. **Milestone 4 (optional):** adaptive backend selection, only if milestone 3 finds
    distinguishable states.

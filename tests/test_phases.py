@@ -104,3 +104,14 @@ def test_summary_keeps_repeated_designs_separate_and_labels_contention(tmp_path,
         ("off-before", "off", "baseline_c1"), ("off-before", "off", "perturbation_c8"),
         ("sham", "sham", "baseline_c1"), ("sham", "sham", "perturbation_c8"),
         ("off-after", "off", "baseline_c1"), ("off-after", "off", "perturbation_c8")]
+
+
+def test_server_row_reports_engine_steps(tmp_path):
+    from synthetic import scrape
+    (tmp_path / "metrics-before.prom").write_text(scrape(0, steps={}))
+    (tmp_path / "metrics-after.prom").write_text(scrape(4, steps={16: 30, 2048: 10}))
+    row = phases.server_row(tmp_path)
+    assert row["server_steps"] == 40
+    assert row["tokens_per_step_mean"] == pytest.approx((16 * 30 + 2048 * 10) / 40)
+    assert row["steps_over_1024_share"] == pytest.approx(0.25)
+    assert row["steps_over_2048_share"] == pytest.approx(0.0)

@@ -18,6 +18,8 @@ REQUIRED_FAMILIES = (
 )
 # Observed once per output token rather than once per request.
 TOKEN_FAMILIES = ("vllm:inter_token_latency_seconds",)
+# Observed once per engine step (scheduler iteration), not per request; optional.
+STEP_FAMILY = "vllm:iteration_tokens_total"
 REQUEST_COUNT_FAMILY = "vllm:request_queue_time_seconds"
 START_TIME = "process_start_time_seconds"
 GAUGES = ("vllm:num_requests_running", "vllm:num_requests_waiting")
@@ -178,7 +180,26 @@ def summarize_pair(before_text: str, after_text: str) -> dict:
         change = delta(histogram(before, family), histogram(after, family), family)
         families[family] = {"count": change["count"], "mean_s": change["mean"],
                             "p50_s": quantile(change, 0.5), "p99_s": quantile(change, 0.99)}
-    return {"families": families, "server_requests": families[REQUEST_COUNT_FAMILY]["count"]}
+    summary = {"families": families, "server_requests": families[REQUEST_COUNT_FAMILY]["count"]}
+    step_before, step_after = histogram(before, STEP_FAMILY), histogram(after, STEP_FAMILY)
+    if step_before is not None and step_after is not None:
+        summary["steps"] = step_summary(delta(step_before, step_after, STEP_FAMILY))
+    return summary
+
+
+def share_above(hist: dict, bound: float) -> float | None:
+    """Fraction of observations above `bound`; exact when `bound` is a bucket edge."""
+    if not hist["count"]:
+        return None
+    at_or_below = max((value for edge, value in hist["buckets"].items() if edge <= bound), default=0.0)
+    return (hist["count"] - at_or_below) / hist["count"]
+
+
+def step_summary(hist: dict) -> dict:
+    """Engine steps in a run and how many tokens each carried (prefill chunks + decodes)."""
+    return {"count": hist["count"], "mean_tokens": hist["mean"],
+            "share_over_512": share_above(hist, 512), "share_over_1024": share_above(hist, 1024),
+            "share_over_2048": share_above(hist, 2048), "share_over_8192": share_above(hist, 8192)}
 
 
 def is_idle(samples: list[Sample]) -> bool:

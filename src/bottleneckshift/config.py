@@ -61,6 +61,10 @@ def load_config(path: Path) -> dict:
             raise ValueError(f"server.{key} cannot be empty")
     if "generation_config" in server and not str(server["generation_config"]).strip():
         raise ValueError("server.generation_config cannot be empty")
+    if "max_num_batched_tokens" in server:
+        budget = server["max_num_batched_tokens"]
+        if not isinstance(budget, int) or isinstance(budget, bool) or budget < 1:
+            raise ValueError("server.max_num_batched_tokens must be a positive integer")
     if "enable_prefix_caching" in server and not isinstance(server["enable_prefix_caching"], bool):
         raise ValueError("server.enable_prefix_caching must be a boolean")
     if not isinstance(config["execution"].get("request_id_prefix", False), bool):

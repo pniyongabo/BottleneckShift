@@ -36,6 +36,9 @@ scrapes taken before and after the run.
 | **Inference time** | Prefill plus decode time, i.e. from first scheduled to finished. |
 | **Chunked prefill** | vLLM's default scheduling: a long prompt's prefill is split into chunks that share each batch step with other requests' decode work, within a token budget (`max_num_batched_tokens`). |
 | **Generation stall** | A decode step slowed because prefill work was scheduled in the same or an intervening step. |
+| **Engine step** | One scheduler iteration of the vLLM engine. It processes up to `max_num_batched_tokens` tokens: one new token per decoding request plus prompt chunks. |
+| **Tokens per step** (*server*) | From the `vllm:iteration_tokens_total` histogram: prompt tokens computed plus tokens generated in each engine step. Phase D reports the mean and the share of steps over 512, 1024, 2048, and 8192 tokens. |
+| **Server step time** (*custom*) | Benchmark duration divided by engine steps in the run: the mean time per step, including idle gaps. |
 
 ## Load and experimental design
 
@@ -54,6 +57,8 @@ scrapes taken before and after the run.
 | **Warm-up** | Unmeasured runs before the measured runs, at each concurrency level, so that model loading, compilation, and allocator effects are excluded from measurements. |
 | **Cooldown** | A 15 s pause between runs. |
 | **Anchor** | A condition repeated from an earlier session (e.g. `anchor_c8`), used to check that results reproduce across sessions. |
+| **Token-budget intervention** | Phase D: setting `max_num_batched_tokens` to 512, 2048, or 8192 to change how many prompt tokens can share a step with decodes. Series `budget-0512`, `budget-8192`, and `budget-2048-before`/`-after`, each at C8 and C32 (`budget_c8`, `budget_c32`). |
+| **Sweep** | Phase D: `prefill_heavy` at C8, C12, C16, C24, and C32 (`sweep_c8` … `sweep_c32`) at the default budget. |
 | **Pre-registration** | Committing the protocol and its predictions before any data are collected. The merge time is the evidence. |
 | **Addendum / amendment** | A dated section added to a protocol before the data it governs. An addendum adds a phase; an amendment refines measurement details. |
 
@@ -105,6 +110,7 @@ experiment configs set. Runner defaults come from `scripts/run_experiment.py`,
 | `server.gpu_memory_utilization` | required | 0.90 | Passed through; vLLM's own default is 0.92. |
 | `server.tensor_parallel_size` | required | 1 | Passed through. |
 | `server.startup_timeout_seconds` | 600 | 600 | Wait for `/health` before failing. |
+| `server.max_num_batched_tokens` | not passed (vLLM default 2048 on this GPU) | 512, 2048, 8192 in Phase D's budget series | Passed as `--max-num-batched-tokens`; the token budget per engine step. |
 | `sampling.temperature` / `top_p` | not sent (the server's default applies, from the model's generation config unless `generation_config = "vllm"`) | 0.0 / 1.0 from Milestone 2 | Passed as `--temperature` / `--top-p`. |
 | `workload.num_prompts` | required (vLLM default 1000) | 100; 50 for `decode_heavy` | Prompts per measured run. |
 | `workload.input_tokens` / `output_tokens` | required (vLLM defaults 1024 / 128) | 256/128, 2048/32, 64/512 | `--random-input-len` / `--random-output-len`. |
@@ -125,7 +131,7 @@ experiment configs set. Runner defaults come from `scripts/run_experiment.py`,
 | Setting | Default | Meaning |
 |---|---|---|
 | `enable_chunked_prefill` | `true` | Prefill split into chunks that share steps with decodes. |
-| `max_num_batched_tokens` | 2048 on this GPU (the API-server default for GPUs under 70 GiB; 8192 on H100/H200) | Token budget per scheduler step. One 2048-token prompt fills a whole step. |
+| `max_num_batched_tokens` | 2048 on this GPU (the API-server default for GPUs under 70 GiB; 8192 on H100/H200) | Token budget per scheduler step. One 2048-token prompt fills a whole step. Left at the default except in Phase D's budget series. |
 | `max_num_seqs` | 256 | Maximum requests in a running batch. |
 | `vllm bench serve --request-rate` | `inf` (also set explicitly) | Send all requests at time 0, limited only by `--max-concurrency`. |
 | `--ready-check-timeout-sec` / `--num-warmups` | 0 / 0 | No extra bench requests, so server request counts equal prompts. |

@@ -141,3 +141,37 @@ def test_phase_c_configs_match_the_addendum():
         assert config["experiment"]["name"] == f"milestone3-contention-{label}-prefill_heavy-forward"
         for key in ("server", "workload", "sampling", "telemetry", "execution", "condition"):
             assert config[key] == base[key]
+
+
+def test_phase_d_configs_match_the_addendum():
+    base = load_config(Path("configs/milestone3-prefill_heavy-forward.toml"))
+    forward = load_config(Path("configs/milestone3-sweep-forward.toml"))
+    reverse = load_config(Path("configs/milestone3-sweep-reverse.toml"))
+    levels = [8, 12, 16, 24, 32]
+    for config in (forward, reverse):
+        for key in ("server", "workload", "sampling", "telemetry"):
+            assert config[key] == base[key]
+        assert "max_num_batched_tokens" not in config["server"]  # vLLM default budget
+        assert config["execution"] == {**base["execution"], "warmup_prompts": 32,
+                                       "warmup_concurrencies": levels}
+    assert [c["max_concurrency"] for c in forward["condition"]] == levels
+    assert list(reversed(forward["condition"])) == reverse["condition"]
+    for budget in (512, 2048, 8192):
+        config = load_config(Path(f"configs/milestone3-budget-{budget:04d}.toml"))
+        assert config["server"] == {**base["server"], "max_num_batched_tokens": budget}
+        for key in ("workload", "sampling", "telemetry"):
+            assert config[key] == base[key]
+        assert config["execution"]["warmup_concurrencies"] == [8, 32]
+        assert [(c["name"], c["max_concurrency"]) for c in config["condition"]] == [
+            ("budget_c8", 8), ("budget_c32", 32)]
+
+
+@pytest.mark.parametrize("value", [0, -1, "2048", True, 1.5])
+def test_token_budget_must_be_a_positive_integer(tmp_path, value):
+    path = tmp_path / "bad.toml"
+    source = Path("configs/milestone1-forward.toml").read_text()
+    literal = f'"{value}"' if isinstance(value, str) else str(value).lower()
+    path.write_text(source.replace("startup_timeout_seconds = 600",
+                                   f"startup_timeout_seconds = 600\nmax_num_batched_tokens = {literal}"))
+    with pytest.raises(ValueError, match="max_num_batched_tokens"):
+        load_config(path)

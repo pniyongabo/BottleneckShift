@@ -69,3 +69,18 @@ def test_quantile_interpolates_within_buckets():
 def test_is_idle_reads_running_and_waiting_gauges():
     assert prometheus.is_idle(prometheus.parse(scrape(1)))
     assert not prometheus.is_idle(prometheus.parse(scrape(1, running=2)))
+
+
+def test_step_histogram_summarizes_tokens_per_engine_step():
+    before = scrape(0, steps={})
+    after = scrape(10, steps={32: 60, 512: 20, 2048: 20})
+    steps = prometheus.summarize_pair(before, after)["steps"]
+    assert steps["count"] == 100
+    assert steps["mean_tokens"] == pytest.approx((32 * 60 + 512 * 20 + 2048 * 20) / 100)
+    assert steps["share_over_512"] == pytest.approx(0.20)
+    assert steps["share_over_1024"] == pytest.approx(0.20)
+    assert steps["share_over_2048"] == pytest.approx(0.0)
+
+
+def test_step_summary_is_absent_when_the_server_does_not_expose_it():
+    assert "steps" not in prometheus.summarize_pair(scrape(0), scrape(5))
