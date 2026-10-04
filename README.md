@@ -11,11 +11,65 @@ not a leaderboard. It uses only public resources, generated prompts, and indepen
 experiments. It contains no proprietary code, data, infrastructure description,
 workload, result, or conclusion.
 
-## First milestone
+## Start here
 
-The implemented milestone holds model, generation lengths, server configuration,
-request count, and host fixed, then changes **maximum client concurrency from 1 to
-8**. Each condition is repeated three times and retains vLLM's raw request-level
+**Status:** milestones 1–3 complete (October 1–3, 2026). Every result below comes from
+pre-registered predictions, validated raw data, and a retained archive with a published
+checksum. The reports score each prediction, including the ones that failed.
+
+### Three findings
+
+1. **Decode dominates end-to-end latency, even with long prompts.** With 2048-token
+   prompts and 32-token outputs on a 0.5B model, prefill takes ~40 ms while the 31
+   generation steps take ~122 ms. A workload that looks prefill-heavy is not.
+   ([Phase B](reports/milestone3-20261003T180358Z-phase-b.md))
+2. **Past saturation, added latency moves into per-step time, not into the wait for the
+   first token.** From C8 to C32, output throughput peaks at C16 and then dips, while
+   median inter-token latency rises from 4.9 to 55 ms and the share of latency spent
+   before the first token *falls* from 0.44 to 0.24. This is consistent with chunked
+   prefill folding prompt work into generation steps, and it means a phase-share metric
+   cannot detect this shift.
+   ([Phase C](reports/milestone3-20261003T201214Z-phase-c.md))
+3. **GPU contention leaves a signature distinct from added load.** A co-located process
+   at a 50% duty cycle costs 13–15% end-to-end latency and 12–13% throughput; it slows
+   concurrency 1 as well as 8, leaves queue time flat, and slows prefill more than
+   decode. Added load does the opposite. Meanwhile `nvidia-smi` utilization moves by
+   only 1–6 points, so it is a weak detector.
+   ([Phase C](reports/milestone3-20261003T201214Z-phase-c.md))
+
+![Phase C crossover](reports/figures/milestone3-phase-c-crossover.png)
+
+![Phase C contention](reports/figures/milestone3-phase-c-contention.png)
+
+More figures and how to regenerate them: [`reports/figures/`](reports/figures/README.md).
+
+### Method in brief
+
+- **Pre-registration.** Each protocol, with numbered predictions and falsification
+  criteria, is merged before its data are collected; the merge time is the evidence
+  ([`experiments/`](experiments/roadmap.md)).
+- **One factor at a time**, in forward and reverse order, with three repetitions, on one
+  host, with pinned model revision, prefix caching off, and explicit sampling.
+- **Three views of every run:** client request timings, vLLM's server-side `/metrics`
+  histograms (queue, prefill, decode), and GPU/CPU telemetry.
+- **Validation before analysis.** Request counts, zero failures, exact token lengths,
+  server counts matching prompts, and telemetry coverage are all checked; analysis
+  refuses an unvalidated series.
+- **Controls for interventions:** a sham condition and a recovery baseline.
+
+### Reading order
+
+1. This section, then the [experimental matrix](#experimental-matrix).
+2. The [Phase C report](reports/milestone3-20261003T201214Z-phase-c.md) for the most
+   complete example: predictions scored row by row, a related-evidence section checked
+   against published work, limitations, and execution problems.
+3. The [roadmap](experiments/roadmap.md) for what is planned and why.
+4. The [glossary](docs/glossary.md) for metric definitions and every setting's default.
+
+## Milestone 1: the concurrency baseline
+
+The first milestone holds model, generation lengths, server configuration, request
+count, and host fixed, then changes **maximum client concurrency from 1 to 8**. Each condition is repeated three times and retains vLLM's raw request-level
 output plus an exact run manifest. The model and tensor parallelism are parameters;
 the default `Qwen/Qwen2.5-0.5B-Instruct` is intentionally small enough for many
 single-GPU systems, but is a starting choice rather than a claimed universal
@@ -41,7 +95,8 @@ The vLLM benchmark client records request-level:
 * input/output token counts and errors; and
 * aggregate request/output-token throughput.
 
-These are **client-observed timings**. Server logs are retained separately. Future
+See the [glossary](docs/glossary.md) for definitions of these and the other terms used in
+reports. These are **client-observed timings**. Server logs are retained separately. Future
 work may collect explicitly labelled server-side metrics, but utilization is
 corroborating evidence—not causal attribution. Every repetition gets a manifest
 containing the resolved config, commands, timestamps, Git revision, Python/platform
@@ -67,7 +122,7 @@ runs before implementation. Milestone 3 uses a narrow slice of milestones 5–8 
 workload regimes and one contention intervention); milestones 5–9 are the full
 single-factor studies and their crossing. See the [roadmap](experiments/roadmap.md).
 
-## Reproduce milestone 1
+## Reproduce the experiments
 
 Prerequisites are Linux, Python 3.11, a CUDA-capable GPU supported by the pinned
 vLLM release, and enough VRAM for the selected model. Create a clean environment:
@@ -89,6 +144,8 @@ python -m pip install -e '.[test]'
 The `test` extra includes matplotlib, used by the Milestone 3 figure test.
 
 Review the full forward execution plan without requiring vLLM or a GPU:
+
+### Milestone 1 protocol
 
 ```bash
 python scripts/run_experiment.py --config configs/milestone1-forward.toml \
@@ -243,7 +300,8 @@ python analysis/phases.py results/runs/SERIES-ID [...] \
 * `experiments/` — hypotheses and protocols written before running.
 * `results/` — retention policy and ignored local run artifacts.
 * `reports/` — reviewed experiment reports and artifact provenance.
-* `docs/` — working notes, e.g. the [milestone workflow](docs/milestone-workflow.md).
+* `docs/` — working notes: the [glossary](docs/glossary.md) and the
+  [milestone workflow](docs/milestone-workflow.md).
 
 ## Limitations and validity threats
 
