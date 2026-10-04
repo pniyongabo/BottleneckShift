@@ -6,7 +6,8 @@ LABELS = 'engine="0",model_name="synthetic"'
 
 
 def scrape(requests: int, *, tokens: int | None = None, seconds: float = 0.01,
-           start_time: float = 1000.0, running: int = 0, waiting: int = 0) -> str:
+           start_time: float = 1000.0, running: int = 0, waiting: int = 0,
+           steps: dict | None = None) -> str:
     """A scrape whose per-request histograms have `requests` observations of `seconds`."""
     tokens = requests * 3 if tokens is None else tokens
     lines = [f"# HELP process_start_time_seconds synthetic", f"process_start_time_seconds {start_time}",
@@ -21,6 +22,18 @@ def scrape(requests: int, *, tokens: int | None = None, seconds: float = 0.01,
                   f"{family}_sum{{{LABELS}}} {count * seconds}",
                   f"{family}_count{{{LABELS}}} {count}",
                   f"{family}_created{{{LABELS}}} 999.0"]
+    if steps is not None:
+        # steps maps an upper bucket edge to the number of steps of that size.
+        edges = [1, 8, 16, 32, 64, 128, 256, 512, 1024, 2048, 4096, 8192, 16384]
+        family = "vllm:iteration_tokens_total"
+        lines.append(f"# TYPE {family} histogram")
+        for edge in edges:
+            cumulative = sum(n for size, n in steps.items() if size <= edge)
+            lines.append(f'{family}_bucket{{{LABELS},le="{edge}.0"}} {cumulative}')
+        total = sum(steps.values())
+        lines += [f'{family}_bucket{{{LABELS},le="+Inf"}} {total}',
+                  f"{family}_sum{{{LABELS}}} {sum(size * n for size, n in steps.items())}",
+                  f"{family}_count{{{LABELS}}} {total}"]
     return "\n".join(lines) + "\n"
 
 

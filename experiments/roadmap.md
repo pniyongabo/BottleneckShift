@@ -48,8 +48,8 @@ vLLM's own within 0.001 ms.
 
 ## Milestone 3 — Diagnose one bottleneck shift
 
-**Status: completed October 3, 2026.** Protocol:
-[`experiments/milestone3.md`](milestone3.md). Reports:
+**Status: Phases B–C completed October 3, 2026; Phase D pre-registered October 4.**
+Protocol: [`experiments/milestone3.md`](milestone3.md). Reports:
 [Phase B](../reports/milestone3-20261003T180358Z-phase-b.md),
 [Phase C](../reports/milestone3-20261003T201214Z-phase-c.md).
 
@@ -62,7 +62,9 @@ vLLM's own within 0.001 ms.
 - **Phase C contention:** GPU contention has a distinct signature: C1 slows too,
   queue time stays flat, prefill slows more than decode, and the front end is
   unaffected.
-- **Carried forward:** a pre-registered per-step (ITL) test of the saturation shift.
+- **Phase D (pre-registered):** a C8–C32 concurrency sweep plus a scheduler token-budget
+  intervention (512, 2048, 8192 tokens per step), measuring step sizes from vLLM's
+  per-step histogram to test the chunked-prefill explanation directly.
 
 **Question:** Under which workload conditions does the dominant source of
 client-visible delay change, and what measurements distinguish the causes?

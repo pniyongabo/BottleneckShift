@@ -305,6 +305,84 @@ further levels are added within Phase C.
 * Report sampler overhead as unmeasured unless time remains for one telemetry-off
   `prefill_heavy` series at the end.
 
+## Phase D addendum (pre-registered 2026-10-04, before any Phase D data)
+
+Phase C's crossover probe falsified its primary prediction. Past saturation (between
+C8 and C16), the added latency moved into per-step time (ITL p50 4.9 → 55 ms at C32),
+not into the wait for the first token. The report's explanation is post hoc: with
+chunked prefill, prompt chunks fill each engine step's token budget
+(`max_num_batched_tokens`, 2048 on this GPU), so generation steps become prefill-sized.
+Phase D tests that explanation directly. It measures step sizes with vLLM's
+`vllm:iteration_tokens_total` histogram and intervenes on the token budget. This
+reopens Milestone 3. All Milestone 2 controls and Phase A–C instrumentation are
+unchanged, and the workload is `prefill_heavy` (2048/32, 100 prompts per run).
+
+### Part 1 — concurrency sweep at the default budget
+
+* **Configs:** `configs/milestone3-sweep-{forward,reverse}.toml`.
+* **Conditions:** C8, C12, C16, C24, C32 (`sweep_c8` … `sweep_c32`). Forward runs them
+  ascending, reverse descending.
+* **Repetitions and warm-ups:** three repetitions, and 32-prompt warm-ups at every level.
+* **Budget:** not passed, so vLLM's default applies, as in Phase C.
+
+**Predictions:**
+
+1. **Primary.** ITL p50 stays below 10 ms at C8, C12, and C16, and exceeds 20 ms at
+   C24 or C32. The per-step transition lies between C16 and C32.
+2. **Mechanism.** The share of engine steps carrying more than 1024 tokens rises
+   monotonically from C8 to C32. So does mean server step time (benchmark duration /
+   engine steps).
+3. **Saturation.** Output throughput peaks at C12 or C16, and C24 and C32 are no more
+   than 5% above that peak.
+4. **Replication.** The client pre-first-token share falls monotonically from C8 to
+   C32.
+5. **Anchor.** C8, C16, and C32 reproduce Phase C within 5% on output throughput and
+   mean E2E. A larger difference is reported as a session effect.
+
+### Part 2 — token-budget intervention
+
+* **Configs:** `configs/milestone3-budget-{0512,2048,8192}.toml`.
+* **Budgets:** `max_num_batched_tokens` set explicitly to 512, 2048, and 8192.
+* **Conditions:** C8 and C32 (`budget_c8`, `budget_c32`), three repetitions each, with
+  32-prompt warm-ups at C8 and C32.
+* **Series, in this order:** `budget-2048-before`, `budget-0512`, `budget-8192`,
+  `budget-2048-after`. The repeated 2048 series brackets drift.
+
+**Predictions:**
+
+6. **Manipulation check.** In every budget series, no engine step carries more tokens
+   than the budget: the share of steps over the budget is 0 at the histogram bucket
+   edges 512, 2048, and 8192.
+7. **Primary.** At C32, ITL p50 is ordered 512 < 2048 < 8192, and ITL p99 follows the
+   same order.
+8. **Trade-off.** At C32, mean TTFT moves the opposite way: 512 > 2048 ≥ 8192.
+9. **Interaction.** The budget changes ITL p50 less at C8 than at C32, in absolute
+   terms (|Δ(8192 − 512)| at C8 < at C32).
+10. **Throughput (secondary, direction only).** At C32, the 512 budget lowers output
+    throughput relative to 2048.
+11. **Drift.** `budget-2048-after` is within 2% of `budget-2048-before` on mean E2E and
+    throughput at both C8 and C32. `budget-2048` also matches the sweep's default
+    budget at C8 and C32 within 5%.
+
+**Falsification.**
+
+- If prediction 6 fails, the intervention did not take effect, and Part 2 is
+  inconclusive.
+- If prediction 6 holds but prediction 7 does not (in particular, if ITL p50 at C32 is
+  not lower at 512 than at 2048), then the explanation that step size, set by the
+  token budget, causes the per-step shift is not supported. The report says so.
+- If prediction 2 fails while prediction 1 holds, the per-step shift exists but is not
+  explained by step size.
+
+### Session rules
+
+* Order: sweep forward, sweep reverse, then the four budget series.
+* Each series is validated as soon as it finishes. A failed series reruns under a new
+  series ID; completed series are kept, and nothing is spliced.
+* Analysis reports ITL p50/p99 from raw inter-token arrays, mean TTFT and E2E,
+  throughput, and, from the step histogram, engine steps, mean tokens per step, the
+  share of steps over 512, 1024, 2048, and 8192 tokens, and mean server step time.
+
 ## Outcome
 
 **Phase B completed October 3, 2026:** pair `milestone3-20261003T180358Z`, 1,800
@@ -324,8 +402,9 @@ measured requests validated.
   baseline; there was a monotonic dose response; prefill slowed more than decode;
   queue stayed flat; the front end was unaffected.
 
-See the [Phase C report](../reports/milestone3-20261003T201214Z-phase-c.md). **Milestone 3 is complete.** The bottleneck-shift
-question is carried forward with a per-step metric.
+See the [Phase C report](../reports/milestone3-20261003T201214Z-phase-c.md). Milestone 3 was marked complete, then
+reopened for Phase D (pre-registered 2026-10-04), which tests the per-step explanation
+directly.
 
 ## Deliverables and acceptance
 

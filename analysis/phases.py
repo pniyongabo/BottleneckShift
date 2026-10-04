@@ -30,7 +30,8 @@ SERVER = {"queue": "vllm:request_queue_time_seconds", "prefill": "vllm:request_p
           "ttft": "vllm:time_to_first_token_seconds", "itl": "vllm:inter_token_latency_seconds"}
 SUMMARY_METRICS = ("ttft_ms", "tpot_ms", "e2el_ms", "output_token_throughput", "client_pre_first_token_share",
                    "server_queue_ms", "server_prefill_ms", "server_decode_ms", "server_pre_first_token_share",
-                   "gpu_util_mean", "cpu_util_mean", "cpu_core_util_max")
+                   "gpu_util_mean", "cpu_util_mean", "cpu_core_util_max", "itl_ms",
+                   "server_step_ms", "tokens_per_step_mean", "steps_over_1024_share")
 
 
 def regime_of(manifest: dict) -> str:
@@ -77,6 +78,12 @@ def server_row(directory: Path) -> dict:
     row["dominant_component"] = "pre_first_token" if queue + prefill > decode else "decode"
     row["largest_phase"] = max((("queue", queue), ("prefill", prefill), ("decode", decode)),
                                key=lambda item: item[1])[0]
+    steps = summary.get("steps")  # vllm:iteration_tokens_total, when the server exposes it
+    if steps and steps["count"]:
+        row["server_steps"] = steps["count"]
+        row["tokens_per_step_mean"] = steps["mean_tokens"]
+        for bound in (512, 1024, 2048, 8192):
+            row[f"steps_over_{bound}_share"] = steps[f"share_over_{bound}"]
     return row
 
 
@@ -97,13 +104,18 @@ def run_rows(root: Path) -> list[dict]:
         document = json.loads((directory / "requests.json").read_text())
         client = compare.summarize(directory / "requests.json")
         row = {"series_id": manifest["series_id"], "regime": regime_of(manifest), "order": order_of(manifest),
-               "contention": contention_of(manifest), "condition": run["condition"], "max_concurrency": run["max_concurrency"],
+               "contention": contention_of(manifest),
+               "token_budget": manifest["config"]["server"].get("max_num_batched_tokens", "default"),
+               "condition": run["condition"], "max_concurrency": run["max_concurrency"],
                "repetition": run["repetition"],
                **{key: client[key] for key in ("requests", "ttft_ms", "tpot_ms", "e2el_ms", "itl_ms",
                                                "vllm_median_e2el_ms", "output_token_throughput")},
                **client_means(document)}
         if enabled.get("server_metrics"):
             row.update(server_row(directory))
+            if row.get("server_steps"):
+                # Mean engine step time over the benchmark window (includes idle gaps).
+                row["server_step_ms"] = document["duration"] * 1000 / row["server_steps"]
             row["ttft_gap_ms"] = row["client_ttft_mean_ms"] - (row["server_queue_ms"] + row["server_prefill_ms"])
             row["itl_gap_ms"] = (row["client_itl_mean_ms"] - row["server_itl_ms"]
                                  if row["client_itl_mean_ms"] is not None else None)
@@ -128,7 +140,8 @@ def summarize(rows: list[dict]) -> list[dict]:
     for (series_id, condition), group in groups.items():
         first = group[0]
         entry = {"series_id": series_id, "regime": first["regime"], "order": first["order"],
-                 "contention": first["contention"], "condition": condition,
+                 "contention": first["contention"], "token_budget": first["token_budget"],
+                 "condition": condition,
                  "max_concurrency": first["max_concurrency"], "repetitions": len(group)}
         for metric in SUMMARY_METRICS:
             values = [row[metric] for row in group if row.get(metric) is not None]

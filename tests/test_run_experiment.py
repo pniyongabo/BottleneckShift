@@ -221,3 +221,13 @@ def test_preflight_port_check_fails_only_for_a_live_listener(tmp_path):
         client.close()
     config = {"server": {"host": "127.0.0.1", "port": port}}
     assert run_experiment.preflight(config, tmp_path / "s")["checks"]["server_port_available"]["ok"]
+
+
+def test_token_budget_becomes_a_server_flag_and_a_control(tmp_path):
+    base = load_config(Path("configs/milestone3-prefill_heavy-forward.toml"))
+    for budget in (512, 2048, 8192):
+        config = load_config(Path(f"configs/milestone3-budget-{budget:04d}.toml"))
+        command = run_experiment.server_command(config)
+        assert command == run_experiment.server_command(base) + ["--max-num-batched-tokens", str(budget)]
+    sweep = load_config(Path("configs/milestone3-sweep-forward.toml"))
+    assert run_experiment.server_command(sweep) == run_experiment.server_command(base)

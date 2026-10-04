@@ -42,6 +42,8 @@ def server_command(config: dict) -> list[str]:
     if "enable_prefix_caching" in server:
         command.append("--enable-prefix-caching" if server["enable_prefix_caching"]
                        else "--no-enable-prefix-caching")
+    if "max_num_batched_tokens" in server:
+        command += ["--max-num-batched-tokens", str(server["max_num_batched_tokens"])]
     return command
 
 
@@ -384,6 +386,8 @@ def main() -> int:
     }
     if "request_id_prefix" in config["execution"]:
         protocol_controls["request_id_prefix"] = config["execution"]["request_id_prefix"]
+    if "max_num_batched_tokens" in config["server"]:
+        protocol_controls["max_num_batched_tokens"] = config["server"]["max_num_batched_tokens"]
     if "telemetry" in config:
         protocol_controls["telemetry"] = config["telemetry"]
     if "contention" in config:
