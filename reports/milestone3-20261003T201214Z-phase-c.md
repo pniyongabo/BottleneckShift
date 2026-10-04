@@ -20,7 +20,8 @@ interpretation section.
 **GPU contention:** almost every prediction held.
 
 * The sham and recovery series match the uncontended baseline within 1%.
-* Latency rises and throughput falls monotonically with duty cycle at both C1 and C8:
+* Latency rises and throughput falls monotonically with duty cycle (the fraction of each
+  100 ms period the generator computes) at both C1 and C8:
   at duty 0.5, E2E is +13% at C1 and +15% at C8, and throughput is −12% and −13%.
 * Server prefill and decode times both rise. Prefill rises the most at C1 (+23% vs
   +11% for decode).
@@ -29,6 +30,33 @@ interpretation section.
 Contention leaves a signature that is distinct from added load. Service times inflate
 at C1 as well as C8, and queue time barely moves (+6% at C8). Raising concurrency from
 C8 to C16 instead roughly doubles queue and decode time and does nothing at C1.
+
+## Terms used in this report
+
+| Term | Meaning |
+|---|---|
+| TTFT | time to first token: from sending a request until its first output token arrives |
+| TPOT | time per output token: (E2E − TTFT) / (output tokens − 1) |
+| ITL | inter-token latency: the gap between consecutive streamed tokens of one request |
+| E2E | end-to-end latency: from sending a request until its last token arrives |
+| Forward / reverse | the same conditions run in opposite orders (C1 then C8, or C8 then C1) |
+| Series / pair | one server start running all warm-ups and measured runs of a config / the series of one session |
+| Warm-up | unmeasured runs before measurement, excluded from analysis |
+| C1, C8 | maximum client concurrency: at most 1 or 8 requests in flight |
+| C16, C32 | maximum client concurrency of 16 or 32 |
+| Anchor (`anchor_c8`) | the Phase B C8 cell repeated, to check reproduction across sessions |
+| Prefill / decode, queue time | prompt processing / per-token generation / server-side wait before first scheduling |
+| Pre-first-token share | fraction of E2E spent before the first token (client Σ TTFT / Σ E2E) |
+| Chunked prefill | vLLM's default: prompt chunks share batch steps with decodes, within a token budget |
+| Duty cycle | fraction of each 100 ms period the contention generator runs matrix multiplies; duty 0.25 = busy 25 ms of every 100 ms |
+| `active-025` / `active-050` | contention series at duty 0.25 / 0.50 (protocol names `active-0.25` / `active-0.50`; configs `configs/milestone3-contention-active-025.toml` / `-050.toml`) |
+| Sham | generator holding its CUDA context and memory but running no kernels |
+| `off-before` / `off-after` | the same design with no generator, before and after the contention series (`off-after` = recovery check) |
+| Achieved / kernel duty | measured busy fraction of the generator / fraction of time its kernels actually ran on the GPU |
+| Closed-loop load | a new request is sent only when one finishes, so in-flight requests never exceed the concurrency limit |
+| Client − server TTFT gap | client mean TTFT minus the server's own TTFT: front-end and client overhead |
+
+Full definitions: [`docs/glossary.md`](../docs/glossary.md).
 
 ## Provenance and protocol
 
@@ -59,8 +87,17 @@ C8 to C16 instead roughly doubles queue and decode time and does nothing at C1.
   reverse is C32, C16, C8.
 - **Contention:** the Phase B `prefill_heavy` design (C1 then C8) with the generator:
   fp16 2048×2048 matrix multiplies, a 100 ms period, and a 1024 MiB cap on total
-  VRAM. Series ran in pre-registered order: `off-before`, `sham`, `active-025`,
-  `active-050`, `off-after`.
+  VRAM. Series ran in pre-registered order:
+  1. `off-before`: no generator; the baseline.
+  2. `sham`: the generator holds its CUDA context and memory but runs no kernels.
+  3. `active-025`: the generator busy 25 ms of every 100 ms (duty 0.25).
+  4. `active-050`: busy 50 ms of every 100 ms (duty 0.50).
+  5. `off-after`: no generator again; the recovery check.
+
+  Series names drop the decimal point. The protocol writes the active series as
+  `active-0.25` and `active-0.50`. The configs are
+  `configs/milestone3-contention-{sham,active-025,active-050}.toml`; both off series
+  use `configs/milestone3-prefill_heavy-forward.toml`.
 
 ## Validation
 
@@ -83,6 +120,15 @@ No server log has `ERROR` lines. The generator's total VRAM (706 MiB, including 
 CUDA context) stayed under the 1024 MiB cap.
 
 ## Measurements
+
+Figures (regenerated from the validated series; see
+[`reports/figures/README.md`](figures/README.md)):
+
+- [`figures/milestone3-phase-c-crossover.png`](figures/milestone3-phase-c-crossover.png):
+  throughput, inter-token latency, and the pre-first-token share against concurrency.
+- [`figures/milestone3-phase-c-contention.png`](figures/milestone3-phase-c-contention.png):
+  server phases, client E2E, and GPU utilization across the five contention series.
+
 
 Medians across three repetitions, with the repetition range where it matters.
 TTFT/TPOT/E2E are per-run medians across requests. Shares, server phases, and
@@ -148,7 +194,7 @@ At duty 0.25 the changes are about half as large.
 | 2 | Monotonic dose response (E2E, TTFT, TPOT up; throughput down) at C1 and C8 | Monotonic for all four metrics in both conditions | **Confirmed** |
 | 3 | Server prefill and decode both rise; at C8 queue rises proportionally more than prefill | Both rise. At C8 queue rises *less* than prefill (+5.6% vs +17.0%) | **Mixed:** first part confirmed, second not |
 | 4 | Client − server TTFT gap within 2 ms of `off-before` | +0.3 ms (C1) and +0.5 ms (C8) | **Confirmed** |
-| 5 | Mean GPU utilization changes < 5 points (off-before → active-0.50) | +1.4 (C1), +6.0 (C8); the off and sham series themselves vary by ±3 points | **Mixed:** within noise at C1, just over at C8 |
+| 5 | Mean GPU utilization changes < 5 points (`off-before` → `active-050`) | +1.4 (C1), +6.0 (C8); the off and sham series themselves vary by ±3 points | **Mixed:** within noise at C1, just over at C8 |
 | 6 | (Secondary) the pre-first-token share at C8 rises under contention | 0.448 → 0.441 → 0.435 (slightly down) | **Not confirmed** |
 | 7 | `off-after` within 2% of `off-before` (E2E, throughput) | Within 0.05% | **Confirmed** |
 
@@ -161,6 +207,10 @@ At duty 0.25 the changes are about half as large.
   - With chunked prefill (enabled), new requests' prompt chunks share iterations with
     ongoing decodes, so a generation step's duration is set by the prefill tokens it
     carries.
+  - On this 16 GB GPU, vLLM 0.29.0's API-server default token budget is
+    `max_num_batched_tokens = 2048` (8192 only on 70 GiB+ GPUs; source
+    `vllm/engine/arg_utils.py`). A single 2048-token prompt can fill a step's
+    budget, after the step's decode tokens are scheduled first.
   - At C32 the steady state always has some prefill in flight, so nearly every step
     becomes a prefill-sized step. The ITL median rising to roughly the ITL p99 at C8
     (~45–55 ms) fits this.
@@ -341,6 +391,8 @@ intervention is the test vLLM's own documentation implies [B4].
   - the host scripts and logs.
 - **Analysis outputs** (`runs.csv`, `summary.csv`) were produced locally from the
   verified archive with `analysis/phases.py` at `d9578ae`.
+- **Committed figures:** `reports/figures/milestone3-phase-c-{crossover,contention}.png`,
+  regenerated from this archive by `analysis/milestone3_figures.py`.
 - **Before publishing:** remove identifying data. `cpu.txt` contains the hostname, and
   the manifests contain the GPU UUID and host paths. The archive is retained outside
   this repository.

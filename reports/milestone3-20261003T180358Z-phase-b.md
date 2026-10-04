@@ -17,6 +17,28 @@ Concurrency 8 does change what grows in each regime:
 So `prefill_heavy` at C8 moves toward a crossover, with pre-first-token time
 approaching parity with decode, but on this model and GPU it does not cross.
 
+## Terms used in this report
+
+| Term | Meaning |
+|---|---|
+| TTFT | time to first token: from sending a request until its first output token arrives |
+| TPOT | time per output token: (E2E − TTFT) / (output tokens − 1) |
+| ITL | inter-token latency: the gap between consecutive streamed tokens of one request |
+| E2E | end-to-end latency: from sending a request until its last token arrives |
+| C1, C8 | maximum client concurrency: at most 1 or 8 requests in flight |
+| Forward / reverse | the same conditions run in opposite orders (C1 then C8, or C8 then C1) |
+| Series / pair | one server start running all warm-ups and measured runs of a config / the series of one session |
+| Warm-up | unmeasured runs before measurement, excluded from analysis |
+| Regime | `prefill_heavy` = 2048 input / 32 output tokens; `decode_heavy` = 64 input / 512 output tokens |
+| Prefill / decode | processing the prompt to produce the first token / generating the remaining tokens one step at a time |
+| Queue time | server-side wait before a request is first scheduled |
+| Pre-first-token share | fraction of E2E spent before the first token: client Σ TTFT / Σ E2E; server (queue + prefill) / (queue + inference) |
+| Dominant component | pre-first-token if mean queue + prefill > mean decode, else decode |
+| p50 / p99 | median / 99th percentile (tail) |
+| Chunked prefill | vLLM's default: long prompts are split into chunks that share batch steps with other requests' decodes |
+
+Full definitions: [`docs/glossary.md`](../docs/glossary.md).
+
 ## Provenance and protocol
 
 - Series: `milestone3-20261003T180358Z-{prefill_heavy,decode_heavy}-{forward,reverse}`,
@@ -72,6 +94,11 @@ Reconstructed E2E latency matches vLLM's own `median_e2el_ms` within 0.001 ms in
 24 measured runs.
 
 ## Measurements
+
+Figure: [`figures/milestone3-phase-b-phases.png`](figures/milestone3-phase-b-phases.png)
+(server phases, client latency, throughput, and GPU utilization per regime and
+concurrency; see [`reports/figures/README.md`](figures/README.md)).
+
 
 Medians across three repetitions, with the repetition range in parentheses. Client
 metrics are per-run medians across requests. Server phases are per-run means from
