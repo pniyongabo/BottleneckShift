@@ -1,13 +1,14 @@
 #!/usr/bin/env python3
-"""Figures for the Milestone 3 Phase C report, regenerated from validated series.
+"""Figures for the Milestone 3 Phase C and Phase D reports, regenerated from validated series.
 
 Usage:
-    python analysis/milestone3_figures.py RUNS_DIR PAIR_ID --output-dir reports/figures
+    python analysis/milestone3_figures.py RUNS_DIR PAIR_ID --output-dir reports/figures [--phase c|d]
 
-RUNS_DIR holds the session's series directories, named `<PAIR_ID>-<name>`
-(crossover-forward, crossover-reverse, off-before, sham, active-025, active-050,
-off-after). Every series is validated before plotting. Requires matplotlib
-(`pip install -e '.[analysis]'`).
+RUNS_DIR holds the session's series directories, named `<PAIR_ID>-<name>`.
+Phase C (default): crossover-forward, crossover-reverse, off-before, sham, active-025,
+active-050, off-after. Phase D: sweep-forward, sweep-reverse, budget-2048-before,
+budget-0512, budget-8192, budget-2048-after. Every series is validated before
+plotting. Requires matplotlib (`pip install -e '.[analysis]'`).
 """
 
 import argparse
@@ -23,6 +24,8 @@ _spec.loader.exec_module(phases)
 
 CROSSOVER = ("crossover-forward", "crossover-reverse", "off-before", "off-after")
 CONTENTION = ("off-before", "sham", "active-025", "active-050", "off-after")
+SWEEP = ("sweep-forward", "sweep-reverse")
+BUDGETS = ("budget-2048-before", "budget-0512", "budget-8192", "budget-2048-after")
 
 
 def percentile(values: list[float], q: float) -> float:
@@ -106,23 +109,91 @@ def contention_figure(series_rows: dict[str, list[dict]], output: Path, plt) -> 
     plt.close(figure)
 
 
+def sweep_figure(rows: list[dict], output: Path, plt) -> None:
+    figure, axes = plt.subplots(1, 3, figsize=(13, 3.8))
+    levels = sorted({row["max_concurrency"] for row in rows})
+    for axis, key, title in ((axes[0], "output_token_throughput", "Output throughput (tok/s)"),
+                             (axes[2], "server_step_ms", "Server iteration time (ms)")):
+        present = [r for r in rows if r.get(key) is not None]
+        axis.set(title=title)
+        if not present:  # the server did not expose vllm:iteration_tokens_total
+            axis.text(0.5, 0.5, "not exposed by the server", ha="center", transform=axis.transAxes)
+            continue
+        axis.scatter([r["max_concurrency"] for r in present], [r[key] for r in present], color="#1665d8",
+                     alpha=0.6, s=18, label="repetition")
+        axis.plot(*by_concurrency(present, key), color="#1665d8", label="median")
+    for key, color, style, label in (("itl_p50_ms", "#1665d8", "-", "p50"), ("itl_p99_ms", "#d45d00", "--", "p99")):
+        axes[1].scatter([r["max_concurrency"] for r in rows], [r[key] for r in rows], color=color, alpha=0.6, s=18)
+        axes[1].plot(*by_concurrency(rows, key), color=color, linestyle=style, label=f"{label} median")
+    axes[1].axhline(10, color="#8c8c8c", linestyle=":", linewidth=1, label="10 / 20 ms (pre-registered)")
+    axes[1].axhline(20, color="#8c8c8c", linestyle=":", linewidth=1)
+    axes[1].set(title="Inter-token latency (ms)", yscale="log")
+    for axis in axes:
+        axis.set(xlabel="Max client concurrency", xticks=levels)
+        axis.set_xticklabels([f"C{level}" for level in levels])
+        axis.legend(fontsize=7)
+    figure.suptitle("Phase D sweep (prefill_heavy, default 2048-token budget): per-step latency jumps between C16 "
+                    "and C24 as throughput plateaus", fontsize=10)
+    figure.tight_layout()
+    figure.savefig(output, dpi=150)
+    plt.close(figure)
+
+
+def budget_figure(series_rows: dict[str, list[dict]], output: Path, plt) -> None:
+    names = [name for name in BUDGETS if name in series_rows]
+    labels = {"budget-2048-before": "2048\n(before)", "budget-0512": "512", "budget-8192": "8192",
+              "budget-2048-after": "2048\n(after)"}
+    figure, axes = plt.subplots(2, 3, figsize=(13, 6.6))
+    panels = ((("itl_p50_ms", "p50", "#1665d8"), ("itl_p99_ms", "p99", "#d45d00")),
+              (("client_ttft_mean_ms", "mean TTFT", "#258750"),),
+              (("output_token_throughput", "output tok/s", "#7d3eb5"),))
+    titles = ("Inter-token latency (ms, log)", "Mean TTFT (ms)", "Output throughput (tok/s)")
+    for row_axes, condition, cond_label in ((axes[0], "budget_c8", "C8"), (axes[1], "budget_c32", "C32")):
+        for axis, metrics, title in zip(row_axes, panels, titles):
+            width = 0.8 / len(metrics)
+            for offset, (key, label, color) in enumerate(metrics):
+                xs = [index + (offset - (len(metrics) - 1) / 2) * width for index in range(len(names))]
+                values = [[r[key] for r in series_rows[name] if r["condition"] == condition] for name in names]
+                axis.bar(xs, [statistics.median(v) for v in values], width=width, color=color, label=label)
+                for x, v in zip(xs, values):
+                    axis.scatter([x] * len(v), v, color="black", s=8, zorder=3)
+            axis.set_xticks(range(len(names)))
+            axis.set_xticklabels([labels[name] for name in names])
+            axis.set(title=f"{cond_label}: {title}")
+            if len(metrics) > 1:
+                axis.set_yscale("log")
+                axis.legend(fontsize=7)
+    figure.suptitle("Phase D token budget (max_num_batched_tokens): small budgets give frequent small stalls, "
+                    "large budgets rare large ones", fontsize=10)
+    figure.tight_layout()
+    figure.savefig(output, dpi=150)
+    plt.close(figure)
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("runs_dir", type=Path)
     parser.add_argument("pair_id")
     parser.add_argument("--output-dir", type=Path, required=True)
+    parser.add_argument("--phase", choices=("c", "d"), default="c")
     args = parser.parse_args()
     import matplotlib
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
 
+    names = CROSSOVER + CONTENTION if args.phase == "c" else SWEEP + BUDGETS
     series = {name: rows_with_itl(args.runs_dir / f"{args.pair_id}-{name}")
-              for name in dict.fromkeys(CROSSOVER + CONTENTION)
+              for name in dict.fromkeys(names)
               if (args.runs_dir / f"{args.pair_id}-{name}").is_dir()}
     args.output_dir.mkdir(parents=True, exist_ok=True)
-    crossover = [row for name in CROSSOVER if name in series for row in series[name]]
-    crossover_figure(crossover, args.output_dir / "milestone3-phase-c-crossover.png", plt)
-    contention_figure(series, args.output_dir / "milestone3-phase-c-contention.png", plt)
+    if args.phase == "c":
+        crossover = [row for name in CROSSOVER if name in series for row in series[name]]
+        crossover_figure(crossover, args.output_dir / "milestone3-phase-c-crossover.png", plt)
+        contention_figure(series, args.output_dir / "milestone3-phase-c-contention.png", plt)
+    else:
+        sweep = [row for name in SWEEP if name in series for row in series[name]]
+        sweep_figure(sweep, args.output_dir / "milestone3-phase-d-sweep.png", plt)
+        budget_figure(series, args.output_dir / "milestone3-phase-d-budget.png", plt)
     print(f"wrote figures to {args.output_dir}")
     return 0
 

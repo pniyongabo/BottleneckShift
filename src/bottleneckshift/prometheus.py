@@ -18,7 +18,10 @@ REQUIRED_FAMILIES = (
 )
 # Observed once per output token rather than once per request.
 TOKEN_FAMILIES = ("vllm:inter_token_latency_seconds",)
-# Observed once per engine step (scheduler iteration), not per request; optional.
+# Observed once per output-producing engine iteration; optional. In vLLM 0.29.0 each
+# observation is (prompt tokens of requests emitting their first token this iteration)
+# + (tokens generated), so a request's whole prompt is credited at its first token, not
+# spread over the chunked-prefill steps that computed it (vllm/v1/metrics/stats.py).
 STEP_FAMILY = "vllm:iteration_tokens_total"
 REQUEST_COUNT_FAMILY = "vllm:request_queue_time_seconds"
 START_TIME = "process_start_time_seconds"
@@ -196,7 +199,12 @@ def share_above(hist: dict, bound: float) -> float | None:
 
 
 def step_summary(hist: dict) -> dict:
-    """Engine steps in a run and how many tokens each carried (prefill chunks + decodes)."""
+    """Output iterations in a run and their histogram values.
+
+    `share_over_N` is the share of iterations whose observation exceeds N. Because whole
+    prompts are credited at their first token, for prompts longer than N this is the share
+    of iterations in which some request completed its prefill, not a per-step chunk size.
+    """
     return {"count": hist["count"], "mean_tokens": hist["mean"],
             "share_over_512": share_above(hist, 512), "share_over_1024": share_above(hist, 1024),
             "share_over_2048": share_above(hist, 2048), "share_over_8192": share_above(hist, 8192)}

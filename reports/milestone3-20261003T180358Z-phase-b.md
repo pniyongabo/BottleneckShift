@@ -95,10 +95,10 @@ Reconstructed E2E latency matches vLLM's own `median_e2el_ms` within 0.001 ms in
 
 ## Measurements
 
-Figure: [`figures/milestone3-phase-b-phases.png`](figures/milestone3-phase-b-phases.png)
-(server phases, client latency, throughput, and GPU utilization per regime and
-concurrency; see [`reports/figures/README.md`](figures/README.md)).
+![Phase B: server phases, client latency, throughput, and GPU utilization per regime and concurrency](figures/milestone3-phase-b-phases.png)
 
+*Server phases, client latency, throughput, and GPU utilization per regime and
+concurrency. Provenance and regeneration: [`reports/figures/README.md`](figures/README.md).*
 
 Medians across three repetitions, with the repetition range in parentheses. Client
 metrics are per-run medians across requests. Server phases are per-run means from

@@ -36,9 +36,9 @@ scrapes taken before and after the run.
 | **Inference time** | Prefill plus decode time, i.e. from first scheduled to finished. |
 | **Chunked prefill** | vLLM's default scheduling: a long prompt's prefill is split into chunks that share each batch step with other requests' decode work, within a token budget (`max_num_batched_tokens`). |
 | **Generation stall** | A decode step slowed because prefill work was scheduled in the same or an intervening step. |
-| **Engine step** | One scheduler iteration of the vLLM engine. It processes up to `max_num_batched_tokens` tokens: one new token per decoding request plus prompt chunks. |
-| **Tokens per step** (*server*) | From the `vllm:iteration_tokens_total` histogram: prompt tokens computed plus tokens generated in each engine step. Phase D reports the mean and the share of steps over 512, 1024, 2048, and 8192 tokens. |
-| **Server step time** (*custom*) | Benchmark duration divided by engine steps in the run: the mean time per step, including idle gaps. |
+| **Engine step** | One scheduler iteration of the vLLM engine. It processes up to `max_num_batched_tokens` tokens: one new token per decoding request plus prompt chunks. vLLM does not export per-step chunk sizes. |
+| **Iteration tokens** (*server*) | The `vllm:iteration_tokens_total` histogram, observed once per output-producing iteration. In vLLM 0.29.0 each value is the full prompt length of requests that emitted their first token in that iteration, plus tokens generated. It is **not** tokens computed per step: a request's whole prompt is credited at its first token. So with 2048-token prompts, "share over 512/1024/2048" is the share of iterations in which a prefill completed, and "share over 8192" the share in which at least four did (Phase D report). |
+| **Server iteration time** (*custom*, column `server_step_ms`) | Benchmark duration divided by output iterations in the run: the mean time per iteration, including idle gaps. |
 
 ## Load and experimental design
 

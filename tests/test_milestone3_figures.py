@@ -64,3 +64,22 @@ def test_main_writes_both_figures(tmp_path, monkeypatch, capsys):
     assert written == ["milestone3-phase-c-contention.png", "milestone3-phase-c-crossover.png"]
     assert all((output / name).stat().st_size > 1000 for name in written)
     assert "wrote figures" in capsys.readouterr().out
+
+
+def test_main_writes_phase_d_figures(tmp_path, monkeypatch, capsys):
+    runs = tmp_path / "runs"
+    runs.mkdir()
+    for name, config in (("sweep-forward", "milestone3-sweep-forward"),
+                         ("budget-2048-before", "milestone3-budget-2048"),
+                         ("budget-0512", "milestone3-budget-0512")):
+        source = small_config(Path(f"configs/{config}.toml").read_text())
+        work = tmp_path / name
+        work.mkdir()
+        root = run_series(work, monkeypatch, run_experiment, source, series_id=f"{PAIR}-{name}")
+        (runs / root.name).symlink_to(root)
+    output = tmp_path / "figures"
+    monkeypatch.setattr("sys.argv", ["milestone3_figures.py", str(runs), PAIR, "--output-dir", str(output),
+                                     "--phase", "d"])
+    assert figures.main() == 0
+    assert sorted(path.name for path in output.iterdir()) == ["milestone3-phase-d-budget.png",
+                                                             "milestone3-phase-d-sweep.png"]
