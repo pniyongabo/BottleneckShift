@@ -13,8 +13,8 @@ workload, result, or conclusion.
 
 ## Start here
 
-**Status:** milestones 1–2 and Milestone 3 Phases B–C complete (October 1–3, 2026);
-Phase D, a direct test of the per-step finding below, is pre-registered. Every result below comes from
+**Status:** milestones 1–3 complete (October 1–6, 2026), including Milestone 3
+Phase D, a direct test of the per-step finding below. Every result below comes from
 pre-registered predictions, validated raw data, and a retained archive with a published
 checksum. The reports score each prediction, including the ones that failed.
 
@@ -29,8 +29,12 @@ checksum. The reports score each prediction, including the ones that failed.
    median inter-token latency rises from 4.9 to 55 ms and the share of latency spent
    before the first token *falls* from 0.44 to 0.24. This is consistent with chunked
    prefill folding prompt work into generation steps, and it means a phase-share metric
-   cannot detect this shift.
-   ([Phase C](reports/milestone3-20261003T201214Z-phase-c.md))
+   cannot detect this shift. A follow-up varied the scheduler's token budget: at C32, a
+   smaller budget (512) evens out ITL but triples TTFT, and a larger one (8192) gives
+   the lowest median ITL and 18% more throughput, at the cost of a 169 ms p99. The
+   saturation point is partly a scheduler default.
+   ([Phase C](reports/milestone3-20261003T201214Z-phase-c.md),
+   [Phase D](reports/milestone3-20261006T022744Z-phase-d.md))
 3. **GPU contention leaves a signature distinct from added load.** A co-located process
    at a 50% duty cycle costs 13–15% end-to-end latency and 12–13% throughput; it slows
    concurrency 1 as well as 8, leaves queue time flat, and slows prefill more than
@@ -41,6 +45,8 @@ checksum. The reports score each prediction, including the ones that failed.
 ![Phase C crossover](reports/figures/milestone3-phase-c-crossover.png)
 
 ![Phase C contention](reports/figures/milestone3-phase-c-contention.png)
+
+![Phase D token budget](reports/figures/milestone3-phase-d-budget.png)
 
 More figures and how to regenerate them: [`reports/figures/`](reports/figures/README.md).
 
@@ -109,7 +115,7 @@ metadata, package inventory, and best-effort GPU inventory.
 |---|---|---|
 | 1 | Workload concurrency: 1 vs 8, fixed generated token targets (cache-enabled) | **Completed; [reviewed report](reports/milestone1-20261001T205137Z.md)** |
 | 2 | Does the milestone 1 effect persist under explicit cache and sampling controls? | **Completed; [reviewed report](reports/milestone2-20261003T034456Z.md)** |
-| 3 | Prefill- vs decode-heavy regimes at C1/C8, plus one contention intervention | Phases B–C completed ([Phase B](reports/milestone3-20261003T180358Z-phase-b.md), [Phase C](reports/milestone3-20261003T201214Z-phase-c.md)); **Phase D pre-registered** ([protocol](experiments/milestone3.md)) |
+| 3 | Prefill- vs decode-heavy regimes, a concurrency crossover, GPU contention, and a scheduler token-budget intervention | **Completed** ([Phase B](reports/milestone3-20261003T180358Z-phase-b.md), [Phase C](reports/milestone3-20261003T201214Z-phase-c.md), [Phase D](reports/milestone3-20261006T022744Z-phase-d.md)) |
 | 4 | Adaptive backend selection, only if milestone 3 finds distinguishable states | Optional |
 | 5 | Workload shape: short/long input and output factorial | Planned |
 | 6 | Network: controlled latency/bandwidth/loss shaping | Planned |
@@ -324,7 +330,7 @@ status, and effort; the experimental matrix above summarizes it.
    cache-enabled concurrency baseline.
 2. **Milestone 2 (completed):** the concurrency comparison repeated under explicit
    cache, sampling, model-revision, and warm-up controls.
-3. **Milestone 3 (core contribution; Phase D pre-registered):** prefill- vs decode-heavy
+3. **Milestone 3 (core contribution; completed):** prefill- vs decode-heavy
    regimes at C1/C8 (Phase B), a crossover probe at C16/C32 and GPU contention with sham
    and recovery controls (Phase C), and a per-step test with a scheduler token-budget
    intervention (Phase D), all with server-side corroboration and pre-registered

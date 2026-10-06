@@ -78,7 +78,9 @@ def server_row(directory: Path) -> dict:
     row["dominant_component"] = "pre_first_token" if queue + prefill > decode else "decode"
     row["largest_phase"] = max((("queue", queue), ("prefill", prefill), ("decode", decode)),
                                key=lambda item: item[1])[0]
-    steps = summary.get("steps")  # vllm:iteration_tokens_total, when the server exposes it
+    # vllm:iteration_tokens_total, when exposed. Counts output iterations; prompt tokens are
+    # credited when a request emits its first token (see prometheus.STEP_FAMILY).
+    steps = summary.get("steps")
     if steps and steps["count"]:
         row["server_steps"] = steps["count"]
         row["tokens_per_step_mean"] = steps["mean_tokens"]
@@ -114,7 +116,7 @@ def run_rows(root: Path) -> list[dict]:
         if enabled.get("server_metrics"):
             row.update(server_row(directory))
             if row.get("server_steps"):
-                # Mean engine step time over the benchmark window (includes idle gaps).
+                # Mean time per output iteration over the benchmark window (includes idle gaps).
                 row["server_step_ms"] = document["duration"] * 1000 / row["server_steps"]
             row["ttft_gap_ms"] = row["client_ttft_mean_ms"] - (row["server_queue_ms"] + row["server_prefill_ms"])
             row["itl_gap_ms"] = (row["client_itl_mean_ms"] - row["server_itl_ms"]

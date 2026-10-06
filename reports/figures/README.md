@@ -13,6 +13,8 @@ first and refuse to plot an incomplete or failing series.
 | `milestone3-phase-b-phases.png` | [Phase B](../milestone3-20261003T180358Z-phase-b.md) | `milestone3-20261003T180358Z` (4 series) | `analysis/phases.py … --output milestone3.png` |
 | `milestone3-phase-c-crossover.png` | [Phase C](../milestone3-20261003T201214Z-phase-c.md) | `milestone3c-20261003T201214Z` | `analysis/milestone3_figures.py` |
 | `milestone3-phase-c-contention.png` | [Phase C](../milestone3-20261003T201214Z-phase-c.md) | `milestone3c-20261003T201214Z` | `analysis/milestone3_figures.py` |
+| `milestone3-phase-d-sweep.png` | [Phase D](../milestone3-20261006T022744Z-phase-d.md) | `milestone3d-20261006T022744Z` | `analysis/milestone3_figures.py --phase d` |
+| `milestone3-phase-d-budget.png` | [Phase D](../milestone3-20261006T022744Z-phase-d.md) | `milestone3d-20261006T022744Z` | `analysis/milestone3_figures.py --phase d` |
 
 ## Reproducing
 
@@ -30,6 +32,11 @@ python analysis/phases.py \
 python analysis/milestone3_figures.py \
   <extracted>/results/runs milestone3c-20261003T201214Z \
   --output-dir reports/figures
+
+# Phase D: sweep and token-budget figures
+python analysis/milestone3_figures.py \
+  <extracted>/results/runs milestone3d-20261006T022744Z \
+  --output-dir reports/figures --phase d
 ```
 
 Figures are PNG at 150 dpi. Markers are per-repetition values and lines or bars are
@@ -50,3 +57,11 @@ medians across the three repetitions, as each figure's legend states.
   0.25, duty 0.50, off again) at C1 and C8: server phases with client E2E, and
   `nvidia-smi` GPU utilization per repetition. Latency rises with duty cycle, sham and
   recovery match the baseline, and utilization barely moves.
+- **`milestone3-phase-d-sweep.png`** — the default-budget sweep (C8, C12, C16, C24,
+  C32; forward and reverse): output throughput, inter-token latency p50 and p99 (log
+  scale, with 10 and 20 ms lines), and server iteration time. The median jumps between
+  C16 and C24 while throughput plateaus.
+- **`milestone3-phase-d-budget.png`** — token budgets 512, 2048 (before and after), and
+  8192 at C8 and C32: ITL p50 and p99 (log scale), mean TTFT, and output throughput.
+  At C32, 512 flattens ITL but raises TTFT; 8192 lowers the median, raises the tail, and
+  raises throughput.

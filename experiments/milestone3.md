@@ -406,6 +406,23 @@ See the [Phase C report](../reports/milestone3-20261003T201214Z-phase-c.md). Mil
 reopened for Phase D (pre-registered 2026-10-04), which tests the per-step explanation
 directly.
 
+**Phase D completed October 6, 2026:** session `milestone3d-20261006T022744Z`, 5,400
+measured requests validated.
+
+- **Sweep:** the transition lies between C16 and C24 (ITL p50 5.5 → 45.8 ms), and
+  throughput plateaus at C16–C24. C8, C16, and C32 reproduce Phase C within about 1%.
+- **Token budget:** the primary prediction held for ITL p99 (512 < 2048 < 8192) but not
+  for p50. At C32, 8192 gave the lowest median (6.9 ms) and 18% more throughput, but the
+  highest tail (169 ms). The falsifier was not triggered (512 < 2048 at p50). As an
+  observation, not a pre-registered result: the budget trades stall frequency against
+  stall size.
+- **Measurement:** vLLM's iteration-token histogram credits whole prompts at first
+  token, so the step-size metric and the manipulation check were not evaluable as
+  specified. Server logs confirm the budgets.
+
+See the [Phase D report](../reports/milestone3-20261006T022744Z-phase-d.md). Milestone 3
+is complete.
+
 ## Deliverables and acceptance
 
 **Deliverables:** this protocol and the Phase C addendum, the configs, validated raw

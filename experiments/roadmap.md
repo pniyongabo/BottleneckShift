@@ -48,10 +48,11 @@ vLLM's own within 0.001 ms.
 
 ## Milestone 3 — Diagnose one bottleneck shift
 
-**Status: Phases B–C completed October 3, 2026; Phase D pre-registered October 4.**
+**Status: completed October 6, 2026** (Phases B–C October 3, Phase D October 6).
 Protocol: [`experiments/milestone3.md`](milestone3.md). Reports:
 [Phase B](../reports/milestone3-20261003T180358Z-phase-b.md),
-[Phase C](../reports/milestone3-20261003T201214Z-phase-c.md).
+[Phase C](../reports/milestone3-20261003T201214Z-phase-c.md),
+[Phase D](../reports/milestone3-20261006T022744Z-phase-d.md).
 
 - **Phase B:** decode dominates E2E latency in both regimes, so the pre-registered
   shift did not occur.
@@ -62,9 +63,12 @@ Protocol: [`experiments/milestone3.md`](milestone3.md). Reports:
 - **Phase C contention:** GPU contention has a distinct signature: C1 slows too,
   queue time stays flat, prefill slows more than decode, and the front end is
   unaffected.
-- **Phase D (pre-registered):** a C8–C32 concurrency sweep plus a scheduler token-budget
-  intervention (512, 2048, 8192 tokens per step), measuring step sizes from vLLM's
-  per-step histogram to test the chunked-prefill explanation directly.
+- **Phase D:** the per-step transition lies between C16 and C24. The scheduler token
+  budget (512, 2048, 8192) reshapes it: 512 gives frequent small stalls (uniform ITL,
+  3× TTFT, −10% throughput); 8192 gives rare large ones (lowest median ITL, highest
+  p99, +18% throughput). The primary ordering held for p99, not p50. vLLM's per-step
+  histogram turned out not to measure chunk sizes, so step sizes were not observed
+  directly.
 
 **Question:** Under which workload conditions does the dominant source of
 client-visible delay change, and what measurements distinguish the causes?

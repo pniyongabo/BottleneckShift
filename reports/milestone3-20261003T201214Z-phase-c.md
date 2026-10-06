@@ -121,14 +121,8 @@ CUDA context) stayed under the 1024 MiB cap.
 
 ## Measurements
 
-Figures (regenerated from the validated series; see
-[`reports/figures/README.md`](figures/README.md)):
-
-- [`figures/milestone3-phase-c-crossover.png`](figures/milestone3-phase-c-crossover.png):
-  throughput, inter-token latency, and the pre-first-token share against concurrency.
-- [`figures/milestone3-phase-c-contention.png`](figures/milestone3-phase-c-contention.png):
-  server phases, client E2E, and GPU utilization across the five contention series.
-
+Figures are regenerated from the validated series; provenance and regeneration are in
+[`reports/figures/README.md`](figures/README.md).
 
 Medians across three repetitions, with the repetition range where it matters.
 TTFT/TPOT/E2E are per-run medians across requests. Shares, server phases, and
@@ -149,6 +143,10 @@ At C16 and C32 the per-run *medians* of TTFT and E2E are unstable. Requests arri
 in waves of the concurrency limit, so the distributions are multimodal. For example,
 C32 median TTFT is 278 ms while the mean is 431 ms and p90 is about 1,150 ms. The
 means and the shares (which are mean-based) are stable across repetitions and orders.
+
+![Phase C crossover: throughput, inter-token latency, and pre-first-token share against concurrency](figures/milestone3-phase-c-crossover.png)
+
+*Throughput, inter-token latency, and the pre-first-token share against concurrency.*
 
 ### Part 2 — GPU contention (`prefill_heavy`, C1 and C8)
 
@@ -173,6 +171,10 @@ Changes at duty 0.50 relative to `off-before`:
 | C8 | +15.3% | +16.2% | +17.6% | −13.4% | +5.6% | +17.0% | +18.0% |
 
 At duty 0.25 the changes are about half as large.
+
+![Phase C contention: server phases, client E2E, and GPU utilization across the five contention series](figures/milestone3-phase-c-contention.png)
+
+*Server phases, client E2E, and GPU utilization across the five contention series.*
 
 ## Predictions vs observed
 
