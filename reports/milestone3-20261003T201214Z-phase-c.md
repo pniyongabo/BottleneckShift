@@ -374,7 +374,7 @@ intervention is the test vLLM's own documentation implies [B4].
   - Optionally, vLLM's iteration-level statistics, if they can be exposed cheaply.
   - This would fit Milestone 5 (workload shape) or a short Milestone 3 addendum
     before more data.
-- **Package the faculty-facing story** from what is now solid:
+- **Summarize the solid results in the README:**
   - a saturation and per-step shift between C8 and C32;
   - a contention signature distinct from load (C1 sensitivity, flat queue,
     prefill-first slowdown);
