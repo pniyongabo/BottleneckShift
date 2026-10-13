@@ -7,8 +7,8 @@ instances while keeping the work inexpensive, repeatable, and easy to repair. It
 an operations plan for the already implemented Milestone 1 concurrency experiment;
 it does not add or claim network, host, or GPU-contention experiments.
 
-The central rule is to separate **cheap, interruptible development** from
-**controlled measurement**:
+The central rule is to separate cheap, interruptible development from controlled
+measurement:
 
 * use local CPU work and short-lived/interruptible GPUs for installation checks,
   model-download checks, and disposable shakedowns;
@@ -28,8 +28,9 @@ Start with the least operationally complex option available in the chosen region
 1. Develop and test everything that does not require CUDA on the local machine.
 2. Rent a single NVIDIA GPU with at least 16 GB VRAM for a 30--60 minute disposable
    shakedown. An L4, A10/A10G, T4, RTX 3090, or RTX 4090 class device is sufficient
-   to evaluate the repository's small default model; this is a compatibility screen,
-   not a claim that different GPU models are scientifically interchangeable.
+   to evaluate the repository's small default model. This only screens for
+   compatibility; it does not imply that different GPU models are scientifically
+   interchangeable.
 3. Prefer an interruptible/spot instance for shakedowns only. Prefer a provider with
    a simple per-second or per-minute lifecycle and persistent storage or snapshots.
 4. After the workflow passes, provision one on-demand instance and run the forward
@@ -80,7 +81,7 @@ factor.
 * [Vast.ai pricing documentation](https://docs.vast.ai/documentation/instances/pricing)
 * [CoreWeave compute documentation](https://docs.coreweave.com/docs/products/compute/overview)
 
-These links are inputs to a provisioning decision, not endorsements. Save the date,
+These links inform a provisioning decision; they are not endorsements. Save the date,
 quoted currency, billing granularity, and ancillary charges; do not scrape a live
 price into an experiment result.
 
@@ -227,7 +228,7 @@ git commit -m "Describe the compatibility fix"
 git push -u origin work
 ```
 
-If diagnosis truly requires editing on the GPU host, create a named branch first and
+If diagnosis requires editing on the GPU host, create a named branch first and
 never edit a detached measured checkout:
 
 ```bash

@@ -9,15 +9,14 @@ jumps to 45 ms at C24 and 56 ms at C32. Over the same range, output throughput p
 prediction about latency and throughput held, and C8, C16, and C32 reproduce Phase C
 within about 1% on a different VM.
 
-**The token budget changes the shape of per-step cost, not just its size.** The primary
-budget prediction (ITL p50 and p99 both ordered 512 < 2048 < 8192 at C32) held for p99
-but **not for p50**:
+**The token budget reshapes per-step cost.** The primary budget prediction (ITL p50 and
+p99 both ordered 512 < 2048 < 8192 at C32) held for p99 but not for p50:
 
 | Budget | Effect at C32 |
 |---|---|
 | 512 | Frequent small stalls: p50 ≈ p99 ≈ 16–18 ms, but TTFT is 3× higher and throughput 10% lower |
 | 2048 (default) | Nearly every step carries about one full prompt: p50 ≈ p99 ≈ 55–59 ms, the worst median |
-| 8192 | Rare large stalls: p50 7 ms but p99 169 ms, with 18% *more* throughput than the default |
+| 8192 | Rare large stalls: p50 7 ms but p99 169 ms, with 18% more throughput than the default |
 
 So the default budget's apparent saturation is partly a scheduler setting. The
 pre-registered falsifier was not triggered: ITL p50 at 512 is far below 2048.
@@ -99,7 +98,7 @@ shown, except where noted.
 Figures are regenerated from the validated series; provenance and regeneration are in
 [`reports/figures/README.md`](figures/README.md).
 
-### Part 1 — concurrency sweep (default budget)
+### Part 1: concurrency sweep (default budget)
 
 | C | Output tok/s | ITL p50 (ms) | ITL p99 (ms) | Mean TTFT (ms) | Mean E2E (ms) | Pre-1st share | Server queue / prefill / decode (ms) | Server iteration time (ms) |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|
@@ -114,7 +113,7 @@ Figures are regenerated from the validated series; provenance and regeneration a
 *Throughput, ITL p50 and p99 (log scale, with the pre-registered 10 and 20 ms lines),
 and server iteration time against concurrency, forward and reverse.*
 
-### Part 2 — token budget
+### Part 2: token budget
 
 | Series | Cond. | Output tok/s | ITL p50 (ms) | ITL p99 (ms) | Mean TTFT (ms) | Mean E2E (ms) | Server queue / prefill / decode (ms) |
 |---|---|---:|---:|---:|---:|---:|---:|
@@ -137,7 +136,7 @@ and C32 (bottom).*
 
 ## Predictions vs observed
 
-### Part 1 — concurrency sweep
+### Part 1: concurrency sweep
 
 | # | Prediction | Observed | Verdict |
 |---|---|---|---|
@@ -147,7 +146,7 @@ and C32 (bottom).*
 | 4 | Pre-first-token share falls monotonically | 0.449 → 0.380 → 0.353 → 0.274 → 0.237 (both orders) | **Confirmed** |
 | 5 | C8, C16, C32 reproduce Phase C within 5% (throughput, mean E2E) | Throughput −0.8%, −0.9%, −1.0%; mean E2E +0.6%, +0.9%, +1.1% | **Confirmed**, on a new VM allocation |
 
-### Part 2 — token budget
+### Part 2: token budget
 
 | # | Prediction | Observed | Verdict |
 |---|---|---|---|
@@ -186,15 +185,15 @@ the 512 arm.
     prompt needs five steps, so prefill capacity per step falls and requests wait: at
     C32, queue time rises to 1.2 s and TTFT triples.
   - **2048 (the default):** with 2048-token prompts and 32 requests, nearly every step
-    carries about one prompt's worth of prefill, so p50 ≈ p99 ≈ 55–59 ms. This is the
-    worst median.
+    carries about one prompt's worth of prefill, so p50 ≈ p99 ≈ 55–59 ms, the worst
+    median.
   - **8192:** several prompts are batched into rare, very large steps. Most steps are
     pure decode (p50 6.9 ms), but those large steps produce a 169 ms p99 and push TTFT
     above the 2048 level. Throughput rises 18%, consistent with fewer, more efficient
     large steps.
-- **What this means for the Phase C finding.** The per-step shift is real and repeatable,
-  and it is set by how the scheduler packs prompt work into generation steps. It is not a
-  fixed hardware ceiling. With a larger budget, throughput at C32 exceeds the default's
+- **What this means for the Phase C finding.** The per-step shift is real and repeatable.
+  It depends on how the scheduler packs prompt work into generation steps, so it is not a
+  fixed hardware ceiling: with a larger budget, throughput at C32 exceeds the default's
   plateau by 18%. "Saturation" in Phases C and D is therefore partly a property of the
   default `max_num_batched_tokens = 2048` on this GPU, which happens to equal the prompt
   length.
@@ -213,7 +212,7 @@ verified in the [Phase C report](milestone3-20261003T201214Z-phase-c.md).
 
 | Finding | Verdict | Evidence |
 |---|---|---|
-| Smaller budgets give lower, steadier ITL | **Supports (p99), qualifies (p50)** | vLLM's own guidance: "Smaller values (e.g., 2048) achieve better ITL because there are fewer prefills slowing down decodes" [B4]. Sarathi-Serve: "iterations with fewer prefill tokens have lower latency" [P1 §4.3]. This study qualifies it: the 8192 budget gives the *lowest* median ITL, because it concentrates prefill work into rare steps. |
+| Smaller budgets give lower, steadier ITL | **Supports (p99), qualifies (p50)** | vLLM's own guidance: "Smaller values (e.g., 2048) achieve better ITL because there are fewer prefills slowing down decodes" [B4]. Sarathi-Serve: "iterations with fewer prefill tokens have lower latency" [P1 §4.3]. This study qualifies it: the 8192 budget gives the lowest median ITL, because it concentrates prefill work into rare steps. |
 | Smaller budgets raise TTFT | **Supports** | Chunked prefill "trades TTFT for TPOT" [P2 §2.2]; "chunked-prefills-only increases TTFT" [P1 §5.4.2]. 512 raises mean TTFT 3× at C32. |
 | Larger budgets improve TTFT | **Opposes, in this setup** | vLLM: "Higher values achieve better time to first token (TTFT) as you can process more prefill tokens in a batch" [B4]. Here 8192 gives a higher mean TTFT than 2048 at C8 and C32, plausibly because each large step makes waiting prefills and decodes slower. |
 | Larger budgets improve throughput for small models | **Supports** | vLLM: "For optimal throughput, we recommend setting max_num_batched_tokens > 8192 especially for smaller models on large GPUs" [B4]. 8192 gives +18% at C32 and +2.6% at C8 on this 0.5B model. |
