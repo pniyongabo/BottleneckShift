@@ -83,7 +83,7 @@ Each milestone went through the same seven stages.
 6. **Report against the predictions table,** row by row (confirmed, not confirmed,
    mixed). Record execution problems in the report rather than re-running for a
    cleaner story.
-7. **Docs move together.** A status change updates the README matrix and staged plan,
+7. **Docs move together.** A status change updates the README findings and status table,
    the roadmap, and the protocol's outcome in the same PR.
 
 ## Further adjustments

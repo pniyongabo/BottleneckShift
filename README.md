@@ -1,344 +1,144 @@
 # BottleneckShift
 
-**A reproducible study of network and resource-contention effects on LLM inference**
+**A pre-registered study of bottleneck shifts in LLM inference serving**
 
-> When an LLM inference service slows down, can controlled experiments distinguish
-> workload effects from host, GPU, and network contention, and identify when the
-> dominant bottleneck shifts?
+> When an LLM inference service slows down, can controlled experiments tell workload
+> effects apart from resource contention, and identify when the dominant bottleneck
+> shifts?
 
-BottleneckShift is a small, staged research project about experimental diagnosis,
-not a leaderboard. It uses only public resources, generated prompts, and independent
-experiments. It contains no proprietary code, data, infrastructure description,
-workload, result, or conclusion.
+BottleneckShift runs controlled experiments on [vLLM](https://github.com/vllm-project/vllm)
+and measures every run three ways: from the client, from the server's own phase
+timings, and from GPU/CPU telemetry. It is about experimental diagnosis, not a
+leaderboard. It uses only public software, generated prompts, and independent
+experiments, with no proprietary code, data, or results.
 
-## Start here
+## Why it matters
 
-**Status:** milestones 1–3 complete (October 1–6, 2026), including Milestone 3
-Phase D, a direct test of the per-step finding below. Every result below comes from
-pre-registered predictions, validated raw data, and a retained archive with a published
-checksum. The reports score each prediction, including the ones that failed.
+Serving systems are tuned for different goals. DistServe, for example, sets separate
+time-to-first-token (TTFT) and time-per-output-token (TPOT) targets for chatbot,
+code-completion, and summarization services [[3]](#related-work). Knowing which phase of
+a request dominates, and when that changes, decides what to tune:
 
-### Three findings
+- **Interactive chat and coding assistants.** Users feel both the wait for the first
+  token and how smoothly tokens stream. Under load, the delay moves into per-step
+  generation, and the scheduler's token budget trades median against tail latency
+  (finding 2).
+- **Long-prompt workloads such as retrieval-augmented generation.** A workload that
+  looks prefill-heavy can still be dominated by decode (finding 1).
+- **Shared GPUs.** Multi-tenant clusters co-locate work with MPS or time slicing
+  [[8]](#related-work). A co-located job slows inference in ways that GPU utilization
+  barely shows (finding 3).
+- **Capacity planning and autoscaling.** The concurrency at which throughput saturates
+  depends partly on a scheduler default, so it's a configuration choice, not a fixed
+  hardware limit (finding 2).
+
+## Findings so far
+
+All on one GPU with a 0.5B model (Qwen2.5-0.5B-Instruct on an RTX A4000).
 
 1. **Decode dominates end-to-end latency, even with long prompts.** With 2048-token
-   prompts and 32-token outputs on a 0.5B model, prefill takes ~40 ms while the 31
-   generation steps take ~122 ms. A workload that looks prefill-heavy is not.
-   ([Phase B](reports/milestone3-20261003T180358Z-phase-b.md))
+   prompts and 32-token outputs, prefill takes about 40 ms and the 31 generation steps
+   about 122 ms. ([Phase B](reports/milestone3-20261003T180358Z-phase-b.md))
 2. **Past saturation, added latency moves into per-step time, not into the wait for the
-   first token.** From C8 to C32, output throughput peaks at C16 and then dips, while
-   median inter-token latency rises from 4.9 to 55 ms and the share of latency spent
-   before the first token *falls* from 0.44 to 0.24. This is consistent with chunked
-   prefill folding prompt work into generation steps, and it means a phase-share metric
-   cannot detect this shift. A follow-up varied the scheduler's token budget: at C32, a
-   smaller budget (512) evens out ITL but triples TTFT, and a larger one (8192) gives
-   the lowest median ITL and 18% more throughput, at the cost of a 169 ms p99. The
-   saturation point is partly a scheduler default.
+   first token.** From 8 to 32 concurrent requests, median inter-token latency (ITL)
+   rises from 4.9 to 55 ms, while the share of latency before the first token *falls*
+   from 0.44 to 0.24, against the pre-registered prediction. Changing vLLM's per-step
+   token budget reshapes this cost: at 32 requests, 8192 tokens gives a 7 ms median ITL
+   and 18% more throughput but a 169 ms p99, while 512 evens out ITL but triples TTFT.
    ([Phase C](reports/milestone3-20261003T201214Z-phase-c.md),
    [Phase D](reports/milestone3-20261006T022744Z-phase-d.md))
 3. **GPU contention leaves a signature distinct from added load.** A co-located process
-   at a 50% duty cycle costs 13–15% end-to-end latency and 12–13% throughput; it slows
-   concurrency 1 as well as 8, leaves queue time flat, and slows prefill more than
-   decode. Added load does the opposite. Meanwhile `nvidia-smi` utilization moves by
-   only 1–6 points, so it is a weak detector.
+   at a 50% duty cycle costs 13–15% end-to-end latency. It slows single requests too,
+   leaves queueing flat, and slows prefill more than decode, while `nvidia-smi`
+   utilization moves only 1–6 points.
    ([Phase C](reports/milestone3-20261003T201214Z-phase-c.md))
 
-![Phase C crossover](reports/figures/milestone3-phase-c-crossover.png)
+![Phase C crossover: throughput, inter-token latency, and pre-first-token share against concurrency](reports/figures/milestone3-phase-c-crossover.png)
 
-![Phase C contention](reports/figures/milestone3-phase-c-contention.png)
+![Phase D token budget: inter-token latency, TTFT, and throughput per budget](reports/figures/milestone3-phase-d-budget.png)
 
-![Phase D token budget](reports/figures/milestone3-phase-d-budget.png)
+More figures, including the contention series: [`reports/figures/`](reports/figures/README.md).
 
-More figures and how to regenerate them: [`reports/figures/`](reports/figures/README.md).
-
-### Method in brief
+## Method
 
 - **Pre-registration.** Each protocol, with numbered predictions and falsification
-  criteria, is merged before its data are collected; the merge time is the evidence
-  ([`experiments/`](experiments/roadmap.md)).
-- **One factor at a time**, in forward and reverse order, with three repetitions, on one
-  host, with pinned model revision, prefix caching off, and explicit sampling.
+  criteria, is merged before its data are collected
+  ([`experiments/`](experiments/roadmap.md)). Every report scores every prediction,
+  including the ones that failed.
+- **One factor at a time,** in forward and reverse order, with three repetitions, a
+  pinned model revision, prefix caching off, and explicit sampling.
 - **Three views of every run:** client request timings, vLLM's server-side `/metrics`
   histograms (queue, prefill, decode), and GPU/CPU telemetry.
-- **Validation before analysis.** Request counts, zero failures, exact token lengths,
-  server counts matching prompts, and telemetry coverage are all checked; analysis
-  refuses an unvalidated series.
+- **Validation before analysis.** Request counts, failures, token lengths, server
+  counts, and telemetry coverage are checked, and analysis refuses an unvalidated
+  series. Raw data are archived with checksums.
 - **Controls for interventions:** a sham condition and a recovery baseline.
 
-### Reading order
+## Related work
 
-1. This section, then the [experimental matrix](#experimental-matrix).
-2. The [Phase C report](reports/milestone3-20261003T201214Z-phase-c.md) for the most
-   complete example: predictions scored row by row, a related-evidence section checked
-   against published work, limitations, and execution problems.
-3. The [roadmap](experiments/roadmap.md) for what is planned and why.
-4. The [glossary](docs/glossary.md) for metric definitions and every setting's default.
+1. Yu et al., [Orca](https://www.usenix.org/conference/osdi22/presentation/yu), OSDI
+   2022: iteration-level scheduling, the batching model vLLM builds on.
+2. Kwon et al., [vLLM / PagedAttention](https://arxiv.org/abs/2309.06180), SOSP 2023:
+   the serving system under study.
+3. Zhong et al., [DistServe](https://arxiv.org/abs/2401.09670), OSDI 2024: prefill and
+   decode interfere, and services set different TTFT and TPOT targets. This study
+   measures that interference on one GPU.
+4. Agrawal et al., [Sarathi-Serve](https://arxiv.org/abs/2403.02310), OSDI 2024: chunked
+   prefill and the per-step token budget. Finding 2 measures that trade-off directly.
+5. Agrawal et al., [Etalon](https://arxiv.org/abs/2407.07000), 2024: averaged metrics
+   such as TPOT hide jitter. Here, median and tail ITL rank the token budgets in
+   opposite orders.
+6. Dean and Barroso, [The Tail at Scale](https://doi.org/10.1145/2408776.2408794), CACM
+   2013: why tail latency, not the average, shapes user experience.
+7. Hoefler and Belli,
+   [Scientific Benchmarking of Parallel Computing Systems](https://doi.org/10.1145/2807591.2807644),
+   SC 2015: the reporting and repetition practices this study follows.
+8. NVIDIA, [Multi-Process Service](https://docs.nvidia.com/deploy/mps/index.html) and
+   [GPU time slicing](https://docs.nvidia.com/datacenter/cloud-native/gpu-operator/latest/gpu-sharing.html):
+   the GPU-sharing mechanisms behind the contention scenario.
 
-## Milestone 1: the concurrency baseline
+Each report has a related-evidence section that checks its findings against these and
+other sources; the [Phase C report](reports/milestone3-20261003T201214Z-phase-c.md) is
+the most complete.
 
-The first milestone holds model, generation lengths, server configuration, request
-count, and host fixed, then changes **maximum client concurrency from 1 to 8**. Each condition is repeated three times and retains vLLM's raw request-level
-output plus an exact run manifest. The model and tensor parallelism are parameters;
-the default `Qwen/Qwen2.5-0.5B-Instruct` is intentionally small enough for many
-single-GPU systems, but is a starting choice rather than a claimed universal
-configuration.
-
-### Pre-registered hypothesis
-
-Increasing concurrency should increase offered load and aggregate throughput until
-the server approaches saturation. Queueing and batching should increase
-client-observed TTFT and end-to-end latency; TPOT may improve initially through
-batching and then degrade. Output lengths should remain near the requested target,
-and errors should remain zero. A different signature is informative and must not be
-silently discarded. This comparison establishes an association with the controlled
-workload change—it does **not** by itself attribute delay to GPU utilization or any
-other resource.
-
-## Metrics and evidence
-
-The vLLM benchmark client records request-level:
-
-* time to first token (TTFT), inter-token latency (ITL), time per output token
-  (TPOT), and end-to-end latency;
-* input/output token counts and errors; and
-* aggregate request/output-token throughput.
-
-See the [glossary](docs/glossary.md) for definitions of these and the other terms used in
-reports. These are **client-observed timings**. Server logs are retained separately. Future
-work may collect explicitly labelled server-side metrics, but utilization is
-corroborating evidence—not causal attribution. Every repetition gets a manifest
-containing the resolved config, commands, timestamps, Git revision, Python/platform
-metadata, package inventory, and best-effort GPU inventory.
-
-## Experimental matrix
+## Status and next steps
 
 | Milestone | Question | Status |
 |---|---|---|
-| 1 | Workload concurrency: 1 vs 8, fixed generated token targets (cache-enabled) | **Completed; [reviewed report](reports/milestone1-20261001T205137Z.md)** |
-| 2 | Does the milestone 1 effect persist under explicit cache and sampling controls? | **Completed; [reviewed report](reports/milestone2-20261003T034456Z.md)** |
-| 3 | Prefill- vs decode-heavy regimes, a concurrency crossover, GPU contention, and a scheduler token-budget intervention | **Completed** ([Phase B](reports/milestone3-20261003T180358Z-phase-b.md), [Phase C](reports/milestone3-20261003T201214Z-phase-c.md), [Phase D](reports/milestone3-20261006T022744Z-phase-d.md)) |
-| 4 | Adaptive backend selection, only if milestone 3 finds distinguishable states | Optional |
-| 5 | Workload shape: short/long input and output factorial | Planned |
-| 6 | Network: controlled latency/bandwidth/loss shaping | Planned |
-| 7 | Host contention: controlled CPU and memory pressure | Planned |
-| 8 | GPU contention: isolated, controlled competing GPU work | Planned |
-| 9 | Bottleneck shift: selected crossed factors from milestones 5–8 | Planned |
+| 1–2 | Concurrency effect, then repeated under explicit cache, sampling, and model controls | Complete ([1](reports/milestone1-20261001T205137Z.md), [2](reports/milestone2-20261003T034456Z.md)) |
+| 3 | Workload regimes, concurrency crossover, GPU contention, token-budget intervention | Complete ([B](reports/milestone3-20261003T180358Z-phase-b.md), [C](reports/milestone3-20261003T201214Z-phase-c.md), [D](reports/milestone3-20261006T022744Z-phase-d.md)) |
+| 4 | Measurement-driven backend selection | Proposed |
+| 5–9 | Workload shape, network, host contention, GPU contention, crossed factors | Proposed |
 
-The later rows are proposals, not completed experiments or findings. Each will need
-a written hypothesis, randomized run order, controls, safety checks, and repeated
-runs before implementation. Milestone 3 uses a narrow slice of milestones 5–8 (two
-workload regimes and one contention intervention); milestones 5–9 are the full
-single-factor studies and their crossing. See the [roadmap](experiments/roadmap.md).
+Proposed milestones are plans, not results. Each needs its own pre-registered protocol
+first. Scope and status: [roadmap](experiments/roadmap.md).
 
-## Reproduce the experiments
+## Reproduce
 
-Prerequisites are Linux, Python 3.11, a CUDA-capable GPU supported by the pinned
-vLLM release, and enough VRAM for the selected model. Create a clean environment:
-
-For a cost-controlled workflow on AWS, GCP, Azure, or public GPU clouds, review the
-[GPU cloud development and execution plan](experiments/gpu-cloud-development-plan.md)
-before provisioning. It separates disposable spot-instance debugging from
-non-interruptible measured runs and includes cost gates, artifact handling, and a
-failure/retry policy.
+Linux, Python 3.11, and a CUDA GPU supported by the pinned vLLM release:
 
 ```bash
-python3.11 -m venv .venv
-source .venv/bin/activate
-python -m pip install --upgrade pip
-python -m pip install -r requirements.txt
-python -m pip install -e '.[test]'
-```
-
-The `test` extra includes matplotlib, used by the Milestone 3 figure test.
-
-Review the full forward execution plan without requiring vLLM or a GPU:
-
-### Milestone 1 protocol
-
-```bash
+python3.11 -m venv .venv && source .venv/bin/activate
+python -m pip install -r requirements.txt && python -m pip install -e '.[test]'
 python scripts/run_experiment.py --config configs/milestone1-forward.toml \
   --series-id DEVICE-MODEL-forward-01 --dry-run
 ```
 
-On the GPU host, verify that vLLM, `nvidia-smi`, the output location, and server port
-are available. Preflight does not start the server or run inference:
+The full guide (preflight, runs, validation, analysis, and instrumentation) is in
+[`docs/reproduce.md`](docs/reproduce.md). Raw data aren't in this repository; each
+report's artifact record gives the archive name and checksum.
 
-```bash
-python scripts/run_experiment.py --config configs/milestone1-forward.toml \
-  --series-id DEVICE-MODEL-forward-01 --preflight
-```
+## Limitations
 
-Then run the forward and reverse series with distinct, meaningful series IDs:
-
-```bash
-python scripts/run_experiment.py --config configs/milestone1-forward.toml \
-  --series-id DEVICE-MODEL-forward-01
-python scripts/run_experiment.py --config configs/milestone1-reverse.toml \
-  --series-id DEVICE-MODEL-reverse-01
-```
-
-Replace `DEVICE-MODEL` with a non-identifying label for the selected setup. A series
-ID may contain letters, numbers, dots, underscores, and hyphens and cannot be reused.
-If omitted, a timestamped ID is generated.
-
-The runner starts one vLLM server, waits for its health endpoint, performs a labelled
-warm-up, executes all measured repetitions in the configured order, and stops the
-server. A cooldown separates benchmark invocations. Forward and reverse plans have
-identical server, workload, and execution settings; only their plan name and condition
-order differ. Do not commit results until inspecting manifests for identifying host
-metadata.
-
-### Run lifecycle and artifacts
-
-The series manifest progresses through `planned`, `warming_up`, `running`, and
-`complete`; exceptions produce `failed`, while a keyboard interrupt produces
-`interrupted`. Before each invocation, `active_run` identifies the condition and
-repetition. Each raw result has a colocated run manifest containing the series and
-plan IDs, measurement role, requested token targets, concurrency, command, timestamps,
-and exit status. Warm-up data is retained under `warmup/` for troubleshooting but is
-not a measured observation and is ignored by analysis.
-
-Analyze all completed repetitions:
-
-```bash
-python analysis/compare.py results/runs --output results/figures/milestone1.svg
-```
-
-The analysis refuses to invent missing observations. It prints a series-labelled,
-run-level CSV summary and, when valid measured results exist, makes a figure showing
-repetition-level distributions rather than presenting a single run as definitive.
-It also reports request counts and realized input/output-token ranges. Before analysis,
-validate complete extracted series against their manifests:
-
-```bash
-python scripts/validate_results.py \
-  results/runs/milestone1-20261001T205137Z-forward \
-  results/runs/milestone1-20261001T205137Z-reverse
-```
-
-This command requires the raw result directories; they are intentionally not in this
-repository. The retained historical archive was unavailable while integrating the
-report. On October 2, 2026, the archive custodian reported running this command on
-both extracted series: all 12 measured runs and 1,200 measured requests passed with
-zero failures and exact configured token lengths. This is a reported external
-validation run, not a rerun performed from this checkout; see the report for its
-scope and the checks that remain dependent on the retained archive.
-
-### Controlled follow-up protocol
-
-This is the milestone 2 protocol; its measured pair is reported in
-[`reports/milestone2-20261003T034456Z.md`](reports/milestone2-20261003T034456Z.md).
-The historical configs remain unchanged. The reviewed follow-up plans
-`configs/milestone1-controlled-forward.toml` and
-`configs/milestone1-controlled-reverse.toml` keep the milestone 1 model, workload,
-server, and execution settings and add these controls:
-
-* model and tokenizer pinned to Hugging Face commit
-  `7ae557604adf67be50417f59c2c2f167def9a775`, the commit `main` resolved to on
-  October 1, 2026 (last modified September 25, 2024);
-* prefix caching explicitly disabled, so the repeated seed-2027 prompts cannot reuse
-  KV cache across warm-ups and repetitions;
-* `generation_config = "vllm"`, so the model's `generation_config.json` defaults
-  (`repetition_penalty` 1.1, `top_k` 20, logged by the milestone 1 server) no
-  longer silently apply;
-* request-level greedy sampling: `temperature = 0.0`, `top_p = 1.0`;
-* separate 10-prompt warm-ups at concurrency 1 and 8; and
-* `percentile_metrics` including `e2el`, so each result also saves vLLM's own
-  `median_e2el_ms`, reported by the analysis as `vllm_median_e2el_ms` to audit the
-  reconstructed `e2el_ms`.
-
-These values are passed to the vLLM CLIs and copied into both series and run
-manifests. `vllm bench serve` has no tokenizer-revision option, so the client
-tokenizes generated prompts with `main`; validation of exact 256-token input lengths
-guards against a silent tokenizer change. Use new series IDs, for example:
-
-```bash
-python scripts/run_experiment.py --config configs/milestone1-controlled-forward.toml \
-  --series-id DEVICE-MODEL-controlled-forward-01 --dry-run
-```
-
-### Milestone 3 instrumentation
-
-Milestone 3 adds opt-in instrumentation. Configs without these settings, including
-every milestone 1 and 2 config, produce byte-identical command plans. The Phase B
-configs are `configs/milestone3-{prefill_heavy,decode_heavy}-{forward,reverse}.toml`.
-See [`experiments/milestone3.md`](experiments/milestone3.md) for the protocol and its
-amendments.
-
-```toml
-[execution]
-request_id_prefix = true   # --request-id-prefix <series>-<condition>-[rep-NN-]
-
-[telemetry]
-server_metrics = true      # /metrics before each run and after the server settles
-gpu_sampler = true         # nvidia-smi every 200 ms -> gpu.csv
-cpu_sampler = true         # mpstat -P ALL 1 -> cpu.txt (apt install sysstat)
-
-[contention]               # Phase C only; requires gpu_sampler
-mode = "active"            # off | sham | active
-duty_cycle = 0.5           # active only
-memory_cap_mib = 1024      # total generator VRAM, including its CUDA context
-```
-
-Instrumented series write manifest schema 4. Next to each `requests.json` the runner
-writes `metrics-before.prom` and `metrics-after.prom`. At series level it writes
-`metrics-initial.prom`, `gpu.csv`, `cpu.txt`, and, with contention,
-`contention.jsonl`. `scripts/validate_results.py` additionally checks warm-ups, that
-the server's request count equals each run's prompt count, telemetry coverage, and the
-contention log.
-
-Analyze validated series with:
-
-```bash
-python -m pip install -e '.[analysis]'   # matplotlib, for the figure
-python analysis/phases.py results/runs/SERIES-ID [...] \
-  --summary results/figures/milestone3-summary.csv --output results/figures/milestone3.svg
-```
-
-`scripts/gpu_contention.py` can also be run by hand during a disposable shakedown.
+One model, one GPU, and one framework version limit generality. Load is closed-loop,
+client and server share a host (so there's no network realism), and prompts are
+generated. Findings are measured associations under controlled changes; server
+metrics and telemetry corroborate them but don't prove causation on their own.
 
 ## Repository layout
 
-* `configs/` — reviewed experiment inputs.
-* `scripts/` — thin orchestration around the official vLLM CLI.
-* `src/bottleneckshift/` — config validation, manifest capture, result validation, and
-  Milestone 3 parsers (Prometheus, telemetry) and contention logic.
-* `analysis/` — transparent post-processing of raw JSON (`compare.py`; `phases.py` for
-  Milestone 3).
-* `experiments/` — hypotheses and protocols written before running.
-* `results/` — retention policy and ignored local run artifacts.
-* `reports/` — reviewed experiment reports and artifact provenance.
-* `docs/` — working notes: the [glossary](docs/glossary.md) and the
-  [milestone workflow](docs/milestone-workflow.md).
-
-## Limitations and validity threats
-
-No raw GPU benchmark results ship with this repository; the reviewed findings and
-external archive records are published in the milestone reports. Generated prompts improve
-repeatability but are not representative of all applications. Tokenizer behavior can
-make realized lengths differ from targets. A single model/GPU/framework combination
-limits external validity. Client and server on one host remove network realism and
-can introduce client interference. Fixed condition order permits drift and warm-up
-effects; repetitions help but do not eliminate them. Framework/version changes can
-alter scheduling and benchmark schemas, hence the dependency pin and raw retention.
-
-## Staged plan (40–50 focused hours total)
-
-The [roadmap](experiments/roadmap.md) is the source of truth for milestone scope,
-status, and effort; the experimental matrix above summarizes it.
-
-1. **Milestone 1 (completed):** reproducible runner, manifests, raw retention, and the
-   cache-enabled concurrency baseline.
-2. **Milestone 2 (completed):** the concurrency comparison repeated under explicit
-   cache, sampling, model-revision, and warm-up controls.
-3. **Milestone 3 (core contribution; completed):** prefill- vs decode-heavy
-   regimes at C1/C8 (Phase B), a crossover probe at C16/C32 and GPU contention with sham
-   and recovery controls (Phase C), and a per-step test with a scheduler token-budget
-   intervention (Phase D), all with server-side corroboration and pre-registered
-   predictions.
-4. **Milestone 4 (optional):** adaptive backend selection, only if milestone 3 finds
-   distinguishable states.
-5. **Milestones 5–9 (beyond the current budget):** full workload-shape, network, host,
-   and GPU contention studies, then motivated crossed conditions.
-
-This scope deliberately excludes Kubernetes, distributed deployment, dashboards,
-databases, a custom load generator, and an adaptive router.
+`configs/` experiment inputs · `scripts/` orchestration around the vLLM CLI ·
+`src/bottleneckshift/` validation, manifests, and parsers · `analysis/` post-processing
+and figures · `experiments/` protocols written before running · `reports/` scored
+results · `docs/` [glossary](docs/glossary.md), [reproduction guide](docs/reproduce.md),
+and [workflow](docs/milestone-workflow.md).

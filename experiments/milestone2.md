@@ -1,7 +1,8 @@
 # Milestone 2 protocol: concurrency under explicit controls
 
 > **Provenance.** This protocol was pre-registered in `experiments/roadmap.md`
-> (Milestone 2 section) and in the README's "Controlled follow-up protocol" section.
+> (Milestone 2 section) and in the README's "Controlled follow-up protocol" section,
+> which now lives in [`docs/reproduce.md`](../docs/reproduce.md#controlled-follow-up-protocol).
 > It was last changed before collection in commit `bfa0af1` (October 2, 2026, 18:09
 > UTC); the measured pair started at 03:44:56 UTC on October 3. This file moves that
 > text here after the run, without substantive change, so each milestone has one
