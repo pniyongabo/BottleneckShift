@@ -44,24 +44,24 @@ medians across the three repetitions, as each figure's legend states.
 
 ## What each figure shows
 
-- **`milestone3-phase-b-phases.png`** — per regime (`prefill_heavy`, `decode_heavy`) and
+- **`milestone3-phase-b-phases.png`**: per regime (`prefill_heavy`, `decode_heavy`) and
   concurrency (C1, C8): server queue/prefill/decode time as stacked bars with client
   TTFT and E2E overlaid, output throughput, and GPU utilization. Decode dominates in
   both regimes.
-- **`milestone3-phase-c-crossover.png`** — `prefill_heavy` against concurrency (C1, C8,
+- **`milestone3-phase-c-crossover.png`**: `prefill_heavy` against concurrency (C1, C8,
   C16, C32): output throughput, inter-token latency p50 and p99 (log scale), and the
   share of E2E spent before the first token, with the pre-registered 0.5 threshold
   marked. Throughput saturates by C16 while the share falls, so the added latency moves
   into per-step time.
-- **`milestone3-phase-c-contention.png`** — the five contention series (off, sham, duty
+- **`milestone3-phase-c-contention.png`**: the five contention series (off, sham, duty
   0.25, duty 0.50, off again) at C1 and C8: server phases with client E2E, and
   `nvidia-smi` GPU utilization per repetition. Latency rises with duty cycle, sham and
   recovery match the baseline, and utilization barely moves.
-- **`milestone3-phase-d-sweep.png`** — the default-budget sweep (C8, C12, C16, C24,
+- **`milestone3-phase-d-sweep.png`**: the default-budget sweep (C8, C12, C16, C24,
   C32; forward and reverse): output throughput, inter-token latency p50 and p99 (log
   scale, with 10 and 20 ms lines), and server iteration time. The median jumps between
   C16 and C24 while throughput plateaus.
-- **`milestone3-phase-d-budget.png`** — token budgets 512, 2048 (before and after), and
+- **`milestone3-phase-d-budget.png`**: token budgets 512, 2048 (before and after), and
   8192 at C8 and C32: ITL p50 and p99 (log scale), mean TTFT, and output throughput.
   At C32, 512 flattens ITL but raises TTFT; 8192 lowers the median, raises the tail, and
   raises throughput.

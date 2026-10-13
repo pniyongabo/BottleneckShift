@@ -68,7 +68,7 @@ caching (D). Cache behavior is a later factor, not part of the concurrency quest
 
    Compare repetitions and execution orders. Keep anomalous observations, including
    the historical reverse C8 outlier.
-4. Compare controlled results with the historical pair as **different protocols**.
+4. Compare controlled results with the historical pair as different protocols.
    Report changes in TTFT, TPOT, end-to-end latency, and output throughput without
    pooling their repetitions.
 5. Audit request timing before making fine-grained phase claims.

@@ -107,13 +107,13 @@ transfer.
 
 | Series | Measured requests | Warm-up requests | Server count = prompts | Telemetry max gap (GPU / CPU) | Contention log |
 |---|---:|---:|---|---|---|
-| crossover-forward | 900 | 96 | yes | 0.21 / 1.0 s | — |
-| crossover-reverse | 900 | 96 | yes | 0.22 / 1.0 s | — |
-| off-before | 600 | 20 | yes | 0.21 / 1.0 s | — |
+| crossover-forward | 900 | 96 | yes | 0.21 / 1.0 s | n/a |
+| crossover-reverse | 900 | 96 | yes | 0.22 / 1.0 s | n/a |
+| off-before | 600 | 20 | yes | 0.21 / 1.0 s | n/a |
 | sham | 600 | 20 | yes | 0.20 / 1.0 s | 0 steps; 706 MiB |
 | active-025 | 600 | 20 | yes | 0.20 / 2.0 s | achieved duty 0.255 (kernel 0.142); 706 MiB |
 | active-050 | 600 | 20 | yes | 0.21 / 1.0 s | achieved duty 0.504 (kernel 0.282); 706 MiB |
-| off-after | 600 | 20 | yes | 0.21 / 1.0 s | — |
+| off-after | 600 | 20 | yes | 0.21 / 1.0 s | n/a |
 
 In total, 4,800 measured requests had zero failures and exact 2048/32 token lengths.
 No server log has `ERROR` lines. The generator's total VRAM (706 MiB, including its
@@ -128,7 +128,7 @@ Medians across three repetitions, with the repetition range where it matters.
 TTFT/TPOT/E2E are per-run medians across requests. Shares, server phases, and
 "mean TTFT" are per-run means.
 
-### Part 1 — crossover probe (`prefill_heavy`, 2048/32)
+### Part 1: crossover probe (`prefill_heavy`, 2048/32)
 
 | Order | Cond. | Median TTFT (ms) | Mean TTFT (ms) | TPOT (ms) | Median E2E (ms) | Output tok/s | Pre-1st share (client / server) | Server queue / prefill / decode (ms) | ITL p50 / p99 (ms) |
 |---|---|---:|---:|---:|---:|---:|---:|---:|---:|
@@ -148,7 +148,7 @@ means and the shares (which are mean-based) are stable across repetitions and or
 
 *Throughput, inter-token latency, and the pre-first-token share against concurrency.*
 
-### Part 2 — GPU contention (`prefill_heavy`, C1 and C8)
+### Part 2: GPU contention (`prefill_heavy`, C1 and C8)
 
 | Series | Cond. | TTFT (ms) | TPOT (ms) | E2E (ms) | Output tok/s | Server queue / prefill / decode (ms) | Pre-1st share (client) | Client − server TTFT (ms) | GPU util |
 |---|---|---:|---:|---:|---:|---:|---:|---:|---:|
@@ -167,7 +167,7 @@ Changes at duty 0.50 relative to `off-before`:
 
 | Cond. | E2E | TTFT | TPOT | Throughput | Queue | Prefill | Decode |
 |---|---:|---:|---:|---:|---:|---:|---:|
-| C1 | +13.4% | +19.0% | +10.8% | −11.8% | — | +22.5% | +11.3% |
+| C1 | +13.4% | +19.0% | +10.8% | −11.8% | n/a | +22.5% | +11.3% |
 | C8 | +15.3% | +16.2% | +17.6% | −13.4% | +5.6% | +17.0% | +18.0% |
 
 At duty 0.25 the changes are about half as large.
@@ -178,7 +178,7 @@ At duty 0.25 the changes are about half as large.
 
 ## Predictions vs observed
 
-### Part 1 — crossover probe
+### Part 1: crossover probe
 
 | # | Prediction | Observed | Verdict |
 |---|---|---|---|
@@ -188,7 +188,7 @@ At duty 0.25 the changes are about half as large.
 | 4 | C32 throughput < 1.5× C8 | 1.07×; it peaks at C16 (1.13×) | **Confirmed** |
 | 5 | C8 anchor reproduces Phase B within 5% (E2E, throughput) | E2E within 0.5% (488.2/489.4 vs 489.2/486.8 ms); throughput within 0.5% | **Confirmed** |
 
-### Part 2 — GPU contention
+### Part 2: GPU contention
 
 | # | Prediction | Observed | Verdict |
 |---|---|---|---|
@@ -221,17 +221,16 @@ At duty 0.25 the changes are about half as large.
     [Phase B report's](milestone3-20261003T180358Z-phase-b.md) related-evidence
     section, references 3–5).
 
-  For this study, the consequence is that a **phase-level share (pre-first-token vs
-  decode) cannot reveal this bottleneck shift**. The shift is from memory-bound
+  For this study, the consequence is that a phase-level share (pre-first-token vs
+  decode) cannot reveal this bottleneck shift. The shift is from memory-bound
   decode steps at low load to compute-heavy mixed steps at high load. It shows up in
   the per-step time distribution (ITL p50) and in throughput saturation, not in which
   phase "dominates". The pre-registered metric was the wrong instrument for this
-  question. This is reported as a finding, not as a reason to re-score the
-  prediction.
+  question. It is reported as a finding; the prediction is not re-scored.
 - **Saturation.** Throughput rises 2.8× from C1 to C8 (Phase B), a further 13% to
   C16, then falls 5% at C32. Queue time grows sub-linearly with concurrency (1.9× and
   3.2×) because the scheduler admits more requests into running batches rather than
-  holding them waiting. The cost lands on per-step time.
+  holding them waiting. Per-step time absorbs the cost.
 - **Contention signature.** GPU contention and added load leave different
   fingerprints:
 
@@ -253,11 +252,11 @@ At duty 0.25 the changes are about half as large.
 - **GPU utilization is not a reliable detector.** The `nvidia-smi` percentage moves by
   1–6 points under contention that costs 13–15% in E2E, and it varies by about 3
   points between identical off and sham series. The generator's own log (achieved and
-  kernel duty) and the server phase times are what identify the contention.
+  kernel duty) and the server phase times identify the contention.
 - **Front end unaffected by GPU contention, but not by load.** The client–server
   TTFT gap is flat under contention, as predicted. It grows with concurrency instead
   (4.6–5 ms at C8, 7.4 at C16, 15 at C32), which fits API-server work per request
-  growing under load. It was not isolated.
+  growing under load, though this was not isolated.
 
 ## Related evidence from published research and engineering sources
 

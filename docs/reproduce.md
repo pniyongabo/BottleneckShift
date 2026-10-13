@@ -8,11 +8,11 @@ page is the [README](../README.md); protocols and predictions are in
 ## Milestone 1: the concurrency baseline
 
 The first milestone holds model, generation lengths, server configuration, request
-count, and host fixed, then changes **maximum client concurrency from 1 to 8**. Each condition is repeated three times and retains vLLM's raw request-level
-output plus an exact run manifest. The model and tensor parallelism are parameters;
-the default `Qwen/Qwen2.5-0.5B-Instruct` is intentionally small enough for many
-single-GPU systems, but is a starting choice rather than a claimed universal
-configuration.
+count, and host fixed, then changes maximum client concurrency from 1 to 8. Each
+condition is repeated three times and retains vLLM's raw request-level output plus an
+exact run manifest. The model and tensor parallelism are parameters. The default,
+`Qwen/Qwen2.5-0.5B-Instruct`, was chosen to fit on many single-GPU systems; it is a
+starting point, not a claimed universal configuration.
 
 ### Pre-registered hypothesis
 
@@ -22,7 +22,7 @@ client-observed TTFT and end-to-end latency; TPOT may improve initially through
 batching and then degrade. Output lengths should remain near the requested target,
 and errors should remain zero. A different signature is informative and must not be
 silently discarded. This comparison establishes an association with the controlled
-workload change—it does **not** by itself attribute delay to GPU utilization or any
+workload change. By itself, it does not attribute delay to GPU utilization or any
 other resource.
 
 ## Metrics and evidence
@@ -34,23 +34,25 @@ The vLLM benchmark client records request-level:
 * input/output token counts and errors; and
 * aggregate request/output-token throughput.
 
-See the [glossary](glossary.md) for definitions of these and the other terms used in
-reports. These are **client-observed timings**. Server logs are retained separately. Milestone 3 adds
-explicitly labelled server-side metrics (see below), but utilization is corroborating
-evidence, not causal attribution. Every repetition gets a manifest
+The [glossary](glossary.md) defines these and the other terms used in reports. These
+are client-observed timings; server logs are retained separately. Milestone 3
+adds explicitly labelled server-side metrics (see below), but utilization is
+corroborating evidence, not causal attribution. Every repetition gets a manifest
 containing the resolved config, commands, timestamps, Git revision, Python/platform
 metadata, package inventory, and best-effort GPU inventory.
 
 ## Reproduce the experiments
 
 Prerequisites are Linux, Python 3.11, a CUDA-capable GPU supported by the pinned
-vLLM release, and enough VRAM for the selected model. Create a clean environment:
+vLLM release, and enough VRAM for the selected model.
 
-For a cost-controlled workflow on AWS, GCP, Azure, or public GPU clouds, review the
+For a cost-controlled workflow on AWS, GCP, Azure, or public GPU clouds, read the
 [GPU cloud development and execution plan](../experiments/gpu-cloud-development-plan.md)
 before provisioning. It separates disposable spot-instance debugging from
 non-interruptible measured runs and includes cost gates, artifact handling, and a
 failure/retry policy.
+
+Create a clean environment:
 
 ```bash
 python3.11 -m venv .venv
@@ -62,9 +64,9 @@ python -m pip install -e '.[test]'
 
 The `test` extra includes matplotlib, used by the Milestone 3 figure test.
 
-Review the full forward execution plan without requiring vLLM or a GPU:
-
 ### Milestone 1 protocol
+
+A dry run prints the full forward execution plan without needing vLLM or a GPU:
 
 ```bash
 python scripts/run_experiment.py --config configs/milestone1-forward.toml \
@@ -116,10 +118,10 @@ python analysis/compare.py results/runs --output results/figures/milestone1.svg
 ```
 
 The analysis refuses to invent missing observations. It prints a series-labelled,
-run-level CSV summary and, when valid measured results exist, makes a figure showing
-repetition-level distributions rather than presenting a single run as definitive.
-It also reports request counts and realized input/output-token ranges. Before analysis,
-validate complete extracted series against their manifests:
+run-level CSV summary, plus request counts and realized input/output-token ranges.
+When valid measured results exist, it also draws a figure of repetition-level
+distributions, so no single run is presented as definitive. Before analysis, validate
+complete extracted series against their manifests:
 
 ```bash
 python scripts/validate_results.py \

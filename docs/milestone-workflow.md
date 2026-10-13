@@ -90,8 +90,8 @@ Each milestone went through the same seven stages.
 
 Done:
 
-- **Reusable host scripts** (`setup`, `run` with resume, `archive`) and a **report
-  template** now live with the local agent skill (untracked for now). A milestone's run
+- **Reusable host scripts** (`setup`, `run` with resume, `archive`) and a report
+  template now live with the local agent skill (untracked for now). A milestone's run
   plan becomes a commit plus a list of series and configs.
 
 Still proposed:

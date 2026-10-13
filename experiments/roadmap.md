@@ -5,8 +5,9 @@
 **Updated October 3, 2026:** Milestone 2 completed; per-milestone protocols moved to
 `experiments/milestoneN.md`.
 
-This is a plan, not a result; completed milestones link to their reports. Each
-milestone needs a reviewed protocol and configs before any measured run.
+This document is the plan; results live in the reports that completed milestones
+link to. Each milestone needs a reviewed protocol and configs before any measured
+run.
 
 ## Starting point
 
@@ -31,7 +32,7 @@ revision, disable prefix caching, set explicit sampling and generation behavior,
 warm both concurrency levels. They produced the Milestone 2 pair, reported in
 [`reports/milestone2-20261003T034456Z.md`](../reports/milestone2-20261003T034456Z.md).
 
-## Milestone 2 — Confirm the concurrency result under explicit controls
+## Milestone 2: Confirm the concurrency result under explicit controls
 
 **Status: completed October 3, 2026.** Protocol:
 [`experiments/milestone2.md`](milestone2.md). Report:
@@ -46,7 +47,7 @@ reverse agree within 0.1% except C8 TTFT. Relative to Milestone 1, C8 TTFT is 21
 higher; TPOT is 3–4% lower and throughput 2–4% higher. Reconstructed E2E matches
 vLLM's own within 0.001 ms.
 
-## Milestone 3 — Diagnose one bottleneck shift
+## Milestone 3: Diagnose one bottleneck shift
 
 **Status: completed October 6, 2026** (Phases B–C October 3, Phase D October 6).
 Protocol: [`experiments/milestone3.md`](milestone3.md). Reports:
@@ -56,7 +57,7 @@ Protocol: [`experiments/milestone3.md`](milestone3.md). Reports:
 
 - **Phase B:** decode dominates E2E latency in both regimes, so the pre-registered
   shift did not occur.
-- **Phase C crossover probe:** past C8 the pre-first-token share *falls*
+- **Phase C crossover probe:** past C8 the pre-first-token share falls
   (0.44 → 0.24 at C32). Throughput peaks at C16, and the cost moves into per-step
   time (ITL p50 4.9 → 55 ms), consistent with chunked prefill inflating generation
   steps.
@@ -87,7 +88,7 @@ falsification check. If attribution remains ambiguous, report that clearly.
 
 **Effort:** approximately 15–22 focused hours, including the tooling.
 
-## Milestone 4 — Test adaptation only if Milestone 3 supports it
+## Milestone 4: Test adaptation only if Milestone 3 supports it
 
 **Question:** Can measurements of changing resource conditions improve backend
 selection for a user-facing inference objective?
@@ -121,7 +122,7 @@ prior-work check.
 **Effort:** approximately 8–12 focused hours if the entry gate passes. Otherwise use
 this time to strengthen Milestone 3 and the final report.
 
-## Milestones 5–9 — Full factor studies
+## Milestones 5–9: Full factor studies
 
 These are the original planned stages, kept as later milestones. Milestone 3 takes a
 deliberately narrow slice of them: two workload regimes and one contention
@@ -139,9 +140,9 @@ metrics, telemetry, request matching). None is scheduled within the current budg
 
 Notes for planning:
 
-* **Milestone 5** generalizes Milestone 3's two regimes into a full factorial; it
-  one config per cell (as in Milestone 3) works for a small factorial, but a larger
-  one needs an optional per-condition workload override in the runner.
+* **Milestone 5** generalizes Milestone 3's two regimes into a full factorial. One
+  config per cell (as in Milestone 3) works for a small factorial, but a larger one
+  needs an optional per-condition workload override in the runner.
 * **Milestone 6** needs the client off the server host, or shaping applied to a
   network path the client actually uses; loopback shaping on one host is not
   representative.
@@ -153,7 +154,7 @@ Notes for planning:
   than running the full grid.
 
 Whichever factor Milestone 3 chooses as its intervention gives that milestone a head
-start. Its Milestone 3 data are a pilot, not a substitute for the full study.
+start. Its Milestone 3 data serve only as a pilot; the full study is still needed.
 
 ## Priority, budget, and final artifact
 

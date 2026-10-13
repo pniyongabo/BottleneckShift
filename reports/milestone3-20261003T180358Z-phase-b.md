@@ -2,7 +2,7 @@
 
 ## Result
 
-The pre-registered shift did **not** occur. Decode time dominates end-to-end latency
+The pre-registered shift did not occur. Decode time dominates end-to-end latency
 in both regimes, including `prefill_heavy` (2048 input / 32 output tokens).
 
 Concurrency 8 does change what grows in each regime:
@@ -127,21 +127,21 @@ Inter-token latency (median across repetitions of each run's p50 / p99):
 
 | Prediction | `prefill_heavy`, C1 → C8 | `decode_heavy`, C1 → C8 |
 |---|---|---|
-| TTFT | rises strongly — **confirmed** (54 → 220 ms, 4.1×) | small absolute rise — **confirmed** (+15 ms) |
-| Pre-first-token share of E2E | high at both — **mixed**: 31% → 45% (client); high relative to decode-heavy, but never dominant | low at both — **confirmed** (≤ 1.3%) |
-| TPOT / ITL | rises, ITL tail widens — **confirmed** (TPOT 2.15×; ITL p99 4.5 → 45.6 ms) | modest rise, like Milestone 2's +12% — **confirmed** (+10%) |
-| Throughput gain | well below ~6.5× — **confirmed** (2.8×) | near or above ~6.5× — **confirmed** (6.46×) |
-| Server queue time | rises at C8 — **confirmed** (~0 → 61 ms) | small at both — **confirmed** (≤ 0.02 ms) |
-| Server prefill time | dominant component — **not confirmed**: decode (122 / 269 ms) exceeds prefill (40 / 117 ms) | minor — **confirmed** |
-| Server decode time | minor — **not confirmed** | dominant — **confirmed** (~99%) |
-| GPU utilization | high during prefill bursts — consistent (89–97% mean) | high and steady — **confirmed** (98–99%) |
+| TTFT | rises strongly; **confirmed** (54 → 220 ms, 4.1×) | small absolute rise; **confirmed** (+15 ms) |
+| Pre-first-token share of E2E | high at both; **mixed**: 31% → 45% (client); high relative to decode-heavy, but never dominant | low at both; **confirmed** (≤ 1.3%) |
+| TPOT / ITL | rises, ITL tail widens; **confirmed** (TPOT 2.15×; ITL p99 4.5 → 45.6 ms) | modest rise, like Milestone 2's +12%; **confirmed** (+10%) |
+| Throughput gain | well below ~6.5×; **confirmed** (2.8×) | near or above ~6.5×; **confirmed** (6.46×) |
+| Server queue time | rises at C8; **confirmed** (~0 → 61 ms) | small at both; **confirmed** (≤ 0.02 ms) |
+| Server prefill time | dominant component; **not confirmed**: decode (122 / 269 ms) exceeds prefill (40 / 117 ms) | minor; **confirmed** |
+| Server decode time | minor; **not confirmed** | dominant; **confirmed** (~99%) |
+| GPU utilization | high during prefill bursts; consistent (89–97% mean) | high and steady; **confirmed** (98–99%) |
 | Stable: zero errors, exact lengths, E2E reconstruction within 1 ms | **confirmed** | **confirmed** |
 | Stable: forward/reverse agreement within repetition ranges | mostly; C8 E2E differs by 0.5% (489.2 vs 486.8 ms) with non-overlapping ranges | **confirmed** |
 
-**The shift being tested** was that the dominant component changes from
-pre-first-token time in `prefill_heavy` to decode in `decode_heavy`. It is **not
-supported**: decode dominates both. The second half, that concurrency amplifies
-different components in each regime, **is supported**:
+The shift being tested was that the dominant component changes from pre-first-token
+time in `prefill_heavy` to decode in `decode_heavy`. It is not supported: decode
+dominates both. The second half, that concurrency amplifies different components in
+each regime, is supported:
 
 * in `prefill_heavy`, C8 multiplies queue (~0 → 61 ms), prefill (2.9×) and decode
   (2.2×) time;
@@ -178,7 +178,7 @@ different components in each regime, **is supported**:
 
 ## Related evidence from published research
 
-This section compares the findings from Milestones 1–3 with published work. The
+Below, the findings from Milestones 1–3 are set against published work. The
 references were checked on October 3, 2026: arXiv identifiers, titles, and first
 authors against arXiv, and the claims against abstracts or full text. Most prior work
 uses 7B–540B models on A100/H100/TPU hardware. Several compare against an older vLLM
@@ -201,7 +201,7 @@ prefill–decode interference findings. What this study adds is a measured,
 pre-registered characterization on a small model and a bandwidth-limited workstation
 GPU, with client, server, and telemetry views of the same runs. The negative result,
 that `prefill_heavy` did not become prefill-dominated, is consistent with this
-literature rather than in tension with it.
+literature.
 
 **References**
 

@@ -37,7 +37,7 @@ scrapes taken before and after the run.
 | **Chunked prefill** | vLLM's default scheduling: a long prompt's prefill is split into chunks that share each batch step with other requests' decode work, within a token budget (`max_num_batched_tokens`). |
 | **Generation stall** | A decode step slowed because prefill work was scheduled in the same or an intervening step. |
 | **Engine step** | One scheduler iteration of the vLLM engine. It processes up to `max_num_batched_tokens` tokens: one new token per decoding request plus prompt chunks. vLLM does not export per-step chunk sizes. |
-| **Iteration tokens** (*server*) | The `vllm:iteration_tokens_total` histogram, observed once per output-producing iteration. In vLLM 0.29.0 each value is the full prompt length of requests that emitted their first token in that iteration, plus tokens generated. It is **not** tokens computed per step: a request's whole prompt is credited at its first token. So with 2048-token prompts, "share over 512/1024/2048" is the share of iterations in which a prefill completed, and "share over 8192" the share in which at least four did (Phase D report). |
+| **Iteration tokens** (*server*) | The `vllm:iteration_tokens_total` histogram, observed once per output-producing iteration. In vLLM 0.29.0 each value is the full prompt length of requests that emitted their first token in that iteration, plus tokens generated. It is not tokens computed per step: a request's whole prompt is credited at its first token. So with 2048-token prompts, "share over 512/1024/2048" is the share of iterations in which a prefill completed, and "share over 8192" the share in which at least four did (Phase D report). |
 | **Server iteration time** (*custom*, column `server_step_ms`) | Benchmark duration divided by output iterations in the run: the mean time per iteration, including idle gaps. |
 
 ## Load and experimental design
@@ -93,7 +93,7 @@ experiment configs set. Runner defaults come from `scripts/run_experiment.py`,
 `validation.py`. vLLM defaults come from the v0.29.0 source: `vllm/config/*.py`,
 `vllm/engine/arg_utils.py`, and `vllm/benchmarks/`.
 
-### Experiment config (TOML) — custom fields
+### Experiment config (TOML): custom fields
 
 | Field | Default | Used here | Meaning |
 |---|---|---|---|

@@ -8,9 +8,9 @@
 
 BottleneckShift runs controlled experiments on [vLLM](https://github.com/vllm-project/vllm)
 and measures every run three ways: from the client, from the server's own phase
-timings, and from GPU/CPU telemetry. It is about experimental diagnosis, not a
-leaderboard. It uses only public software, generated prompts, and independent
-experiments, with no proprietary code, data, or results.
+timings, and from GPU/CPU telemetry. The goal is experimental diagnosis. Everything
+here uses public software, generated prompts, and independent experiments, with no
+proprietary code, data, or results.
 
 ## Why it matters
 
@@ -41,7 +41,7 @@ All on one GPU with a 0.5B model (Qwen2.5-0.5B-Instruct on an RTX A4000).
    about 122 ms. ([Phase B](reports/milestone3-20261003T180358Z-phase-b.md))
 2. **Past saturation, added latency moves into per-step time, not into the wait for the
    first token.** From 8 to 32 concurrent requests, median inter-token latency (ITL)
-   rises from 4.9 to 55 ms, while the share of latency before the first token *falls*
+   rises from 4.9 to 55 ms, while the share of latency before the first token falls
    from 0.44 to 0.24, against the pre-registered prediction. Changing vLLM's per-step
    token budget reshapes this cost: at 32 requests, 8192 tokens gives a 7 ms median ITL
    and 18% more throughput but a 169 ms p99, while 512 evens out ITL but triples TTFT.
@@ -110,7 +110,7 @@ the most complete.
 | 4 | Measurement-driven backend selection | Proposed |
 | 5–9 | Workload shape, network, host contention, GPU contention, crossed factors | Proposed |
 
-Proposed milestones are plans, not results. Each needs its own pre-registered protocol
+Proposed milestones have no data yet, and each needs its own pre-registered protocol
 first. Scope and status: [roadmap](experiments/roadmap.md).
 
 ## Reproduce

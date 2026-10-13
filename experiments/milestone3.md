@@ -26,12 +26,12 @@ each regime's token lengths.
 
 ## Phases
 
-### Phase A — tooling (no measured data)
+### Phase A: tooling (no measured data)
 
 Implement and test the prerequisites below, then run one disposable GPU shakedown of
 the tooling. No Phase A output is analyzed.
 
-### Phase B — baseline regimes (pre-registered by this file)
+### Phase B: baseline regimes (pre-registered by this file)
 
 Two contrasting workload regimes, each at C1 and C8, each in forward and reverse
 order:
@@ -55,7 +55,7 @@ override is needed: `configs/milestone3-{prefill_heavy,decode_heavy}-{forward,re
 Each pair differs only in plan name and condition order. The server restarts between
 series, as in Milestone 2.
 
-### Phase C — one intervention (pre-registered by a later addendum)
+### Phase C: one intervention (pre-registered by a later addendum)
 
 Chosen after Phase B shows which regime is informative. The addendum must state the
 intervention, its fixed intensity, the predicted signature, and the controls below,
@@ -173,7 +173,7 @@ schedule.
 
 ## Amendments
 
-### 2026-10-03 — Phase A measurement details (before any Milestone 3 data)
+### 2026-10-03: Phase A measurement details (before any Milestone 3 data)
 
 These refine how Phase A measures, as the status banner allows. Phase B's regimes,
 conditions, prompt counts, and predicted signatures are unchanged.
@@ -222,7 +222,7 @@ Phase A instrumentation are unchanged. The protocol's single intervention is
 contention (part 2). The crossover probe (part 1) extends Phase B's workload axis
 and was added because of the Phase B result; it is labeled that way in the report.
 
-### Part 1 — crossover probe (concurrency)
+### Part 1: crossover probe (concurrency)
 
 * **Configs:** `configs/milestone3-crossover-{forward,reverse}.toml`.
 * **Workload:** `prefill_heavy` (2048 input / 32 output tokens, 100 prompts per run).
@@ -248,7 +248,7 @@ and was added because of the Phase B result; it is labeled that way in the repor
 reached at this workload and concurrency range. That outcome is reported as is; no
 further levels are added within Phase C.
 
-### Part 2 — GPU contention
+### Part 2: GPU contention
 
 * **Cell:** the Phase B `prefill_heavy` design (C1 and C8, three repetitions, forward
   order), so each contention series is directly comparable to Phase B.
@@ -317,7 +317,7 @@ Phase D tests that explanation directly. It measures step sizes with vLLM's
 reopens Milestone 3. All Milestone 2 controls and Phase A–C instrumentation are
 unchanged, and the workload is `prefill_heavy` (2048/32, 100 prompts per run).
 
-### Part 1 — concurrency sweep at the default budget
+### Part 1: concurrency sweep at the default budget
 
 * **Configs:** `configs/milestone3-sweep-{forward,reverse}.toml`.
 * **Conditions:** C8, C12, C16, C24, C32 (`sweep_c8` … `sweep_c32`). Forward runs them
@@ -339,7 +339,7 @@ unchanged, and the workload is `prefill_heavy` (2048/32, 100 prompts per run).
 5. **Anchor.** C8, C16, and C32 reproduce Phase C within 5% on output throughput and
    mean E2E. A larger difference is reported as a session effect.
 
-### Part 2 — token-budget intervention
+### Part 2: token-budget intervention
 
 * **Configs:** `configs/milestone3-budget-{0512,2048,8192}.toml`.
 * **Budgets:** `max_num_batched_tokens` set explicitly to 512, 2048, and 8192.
