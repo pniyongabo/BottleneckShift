@@ -386,10 +386,11 @@ unchanged, and the workload is `prefill_heavy` (2048/32, 100 prompts per run).
 ## Outcome
 
 **Phase B completed October 3, 2026:** pair `milestone3-20261003T180358Z`, 1,800
-measured requests validated. Decode dominates E2E latency in both regimes, so the
-pre-registered shift (pre-first-token dominance in `prefill_heavy`) did not occur.
+measured requests validated. Decode dominates per-request E2E latency in both regimes,
+so the pre-registered shift (pre-first-token dominance in `prefill_heavy`) did not occur.
 C8 does amplify different components: queueing, prefill, and the ITL tail in
-`prefill_heavy`, and only decode (+10%) in `decode_heavy`. See the
+`prefill_heavy`, and only decode (+10%) in `decode_heavy`. Forward/reverse agreement
+within repetition ranges was not met in either regime (differences up to ~2.5%). See the
 [Phase B report](../reports/milestone3-20261003T180358Z-phase-b.md). Phase C is next and needs its addendum committed first.
 
 **Phase C completed October 3, 2026:** session `milestone3c-20261003T201214Z`, 4,800
@@ -398,9 +399,12 @@ measured requests validated.
 - **Crossover probe:** the primary prediction failed in the opposite direction. The
   pre-first-token share fell (0.44 → 0.35 → 0.24 at C8, C16, C32). Throughput peaked
   at C16, and the added latency moved into per-step time (ITL p50 4.9 → 55 ms).
-- **GPU contention:** almost all predictions held. Sham and recovery matched the
-  baseline; there was a monotonic dose response; prefill slowed more than decode;
-  queue stayed flat; the front end was unaffected.
+- **GPU contention:** four of seven predictions held, two were mixed, and one failed.
+  Sham and recovery matched the baseline; there was a monotonic dose response; prefill
+  slowed more than decode at C1; the front end was unaffected. At C8, queue time rose
+  less than prefill (+6% vs +17%), so the second half of prediction 3 failed;
+  utilization rose 6.0 points, over the 5-point limit; and the pre-first-token share
+  fell slightly.
 
 See the [Phase C report](../reports/milestone3-20261003T201214Z-phase-c.md). Milestone 3 was marked complete, then
 reopened for Phase D (pre-registered 2026-10-04), which tests the per-step explanation
@@ -413,12 +417,14 @@ measured requests validated.
   throughput plateaus at C16–C24. C8, C16, and C32 reproduce Phase C within about 1%.
 - **Token budget:** the primary prediction held for ITL p99 (512 < 2048 < 8192) but not
   for p50. At C32, 8192 gave the lowest median (6.9 ms) and 18% more throughput, but the
-  highest tail (169 ms). The falsifier was not triggered (512 < 2048 at p50). As an
-  observation, not a pre-registered result: the budget trades stall frequency against
-  stall size.
+  highest tail (169 ms). The manipulation check failed as specified, which makes Part 2
+  inconclusive under the pre-registered rule. Accepting server-log evidence that the
+  budgets were applied is a deviation; under it, prediction 7's failure means the
+  step-size explanation is not supported, and only 512 < 2048 at p50 held. The reading
+  that the budget trades stall frequency against stall size is post hoc.
 - **Measurement:** vLLM's iteration-token histogram credits whole prompts at first
-  token, so the step-size metric and the manipulation check were not evaluable as
-  specified. Server logs confirm the budgets.
+  token, so the step-size metric measures prefill completions and the manipulation
+  check failed as specified. Server logs show the budgets were applied.
 
 See the [Phase D report](../reports/milestone3-20261006T022744Z-phase-d.md). Milestone 3
 is complete.

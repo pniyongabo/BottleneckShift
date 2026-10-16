@@ -14,8 +14,8 @@ run.
 Milestone 1 ran `Qwen/Qwen2.5-0.5B-Instruct` with vLLM 0.29.0 on one RTX A4000. It
 compared maximum client concurrency 1 and 8 in forward and reverse order, with three
 repetitions per condition. The [published report](../reports/milestone1-20261001T205137Z.md)
-found approximately 6.6× higher output-token throughput at concurrency 8 and
-approximately 16% higher median request latency. Prefix caching, a single
+found approximately 6.65× higher output-token throughput at concurrency 8,
+approximately 16% higher median end-to-end latency, and about twice the median TTFT. Prefix caching, a single
 concurrency-1 warm-up, an unpinned model revision, and implicit sampling defaults
 limit how much of the effect can be attributed to concurrency alone.
 
@@ -43,7 +43,8 @@ are controlled?
 
 Pair `milestone2-20261003T034456Z`: 1,200 measured requests validated. C8 gives ~6.5×
 output throughput at ~18% higher median E2E latency in both orders; forward and
-reverse agree within 0.1% except C8 TTFT. Relative to Milestone 1, C8 TTFT is 21–42%
+reverse agree within 0.1% on throughput and E2E latency and within 0.2% on TPOT, and
+TTFT differs by 3.5% at C1 and 7.1% at C8. Relative to Milestone 1, C8 TTFT is 21–42%
 higher; TPOT is 3–4% lower and throughput 2–4% higher. Reconstructed E2E matches
 vLLM's own within 0.001 ms.
 
@@ -55,19 +56,23 @@ Protocol: [`experiments/milestone3.md`](milestone3.md). Reports:
 [Phase C](../reports/milestone3-20261003T201214Z-phase-c.md),
 [Phase D](../reports/milestone3-20261006T022744Z-phase-d.md).
 
-- **Phase B:** decode dominates E2E latency in both regimes, so the pre-registered
-  shift did not occur.
+- **Phase B:** decode dominates per-request E2E latency in both regimes, so the
+  pre-registered shift did not occur. Forward and reverse orders differ slightly beyond
+  repetition ranges in both regimes (at most ~2.5% on latency and throughput).
 - **Phase C crossover probe:** past C8 the pre-first-token share falls
   (0.44 → 0.24 at C32). Throughput peaks at C16, and the cost moves into per-step
   time (ITL p50 4.9 → 55 ms), consistent with chunked prefill inflating generation
   steps.
-- **Phase C contention:** GPU contention has a distinct signature: C1 slows too,
-  queue time stays flat, prefill slows more than decode, and the front end is
-  unaffected.
+- **Phase C contention:** under closed-loop load, GPU contention looks different from
+  added load. C1 slows too, prefill slows more than decode at C1, and the front end is
+  unaffected. Four of seven predictions held. Queue time at C8 rose only 6%, which
+  falsified the prediction that it would rise more than prefill.
 - **Phase D:** the per-step transition lies between C16 and C24. The scheduler token
   budget (512, 2048, 8192) reshapes it: 512 gives frequent small stalls (uniform ITL,
-  3× TTFT, −10% throughput); 8192 gives rare large ones (lowest median ITL, highest
-  p99, +18% throughput). The primary ordering held for p99, not p50. vLLM's per-step
+  3× TTFT, −10% throughput); 8192 gives large stalls on about one gap in eight (lowest
+  median ITL, highest p99, +18% throughput). The primary ordering held for p99 and
+  failed for p50, and the manipulation check failed as specified, so the step-size
+  explanation was not supported as pre-registered. vLLM's per-step
   histogram turned out not to measure chunk sizes, so step sizes were not observed
   directly.
 

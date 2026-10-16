@@ -17,19 +17,24 @@ plausibly folded into every generation step by chunked prefill, so it shows up a
 decode time, not as time before the first token. This reading is post hoc; see the
 interpretation section.
 
-**GPU contention:** almost every prediction held.
+**GPU contention:** four of seven predictions held, two were mixed, and one failed.
 
 * The sham and recovery series match the uncontended baseline within 1%.
 * Latency rises and throughput falls monotonically with duty cycle (the fraction of each
   100 ms period the generator computes) at both C1 and C8:
   at duty 0.5, E2E is +13% at C1 and +15% at C8, and throughput is −12% and −13%.
 * Server prefill and decode times both rise. Prefill rises the most at C1 (+23% vs
-  +11% for decode).
+  +11% for decode). At C8, queue time rises less than prefill (+6% vs +17%), so the
+  second half of prediction 3 failed.
 * The client–server TTFT gap is unchanged.
+* `nvidia-smi` utilization moves +1.4 points at C1 and +6.0 at C8, so the 5-point
+  prediction failed at C8.
+* The secondary prediction that the C8 pre-first-token share rises failed; it fell
+  slightly (0.448 → 0.435).
 
-Contention leaves a signature that is distinct from added load. Service times inflate
-at C1 as well as C8, and queue time barely moves (+6% at C8). Raising concurrency from
-C8 to C16 instead roughly doubles queue and decode time and does nothing at C1.
+Under closed-loop load, contention and added load look different. Contention inflates
+service times at C1 as well as C8, while queue time at C8 rises only 6%. Raising
+concurrency from C8 to C16 instead roughly doubles queue and decode time.
 
 ## Terms used in this report
 
@@ -54,7 +59,7 @@ C8 to C16 instead roughly doubles queue and decode time and does nothing at C1.
 | `off-before` / `off-after` | the same design with no generator, before and after the contention series (`off-after` = recovery check) |
 | Achieved / kernel duty | measured busy fraction of the generator / fraction of time its kernels actually ran on the GPU |
 | Closed-loop load | a new request is sent only when one finishes, so in-flight requests never exceed the concurrency limit |
-| Client − server TTFT gap | client mean TTFT minus the server's own TTFT: front-end and client overhead |
+| Client − server TTFT gap | client mean TTFT minus the server's own TTFT, whose timer starts when tokenization begins: HTTP, streaming, and client overhead |
 
 Full definitions: [`docs/glossary.md`](../docs/glossary.md).
 
@@ -71,8 +76,8 @@ Full definitions: [`docs/glossary.md`](../docs/glossary.md).
   - `d9578ae` (PR #15, a fix to the generator's startup VRAM check; see the execution
     notes) for `sham`, both active series, and `off-after`.
 
-  The commits differ only in `scripts/gpu_contention.py`, which the probe and the off
-  series do not use.
+  The commits differ only in `scripts/gpu_contention.py` and its test,
+  `tests/test_contention.py`, which the probe and the off series do not use.
 - **Controls:** the same as Milestone 2 and Phase B, confirmed in every `server.log`:
   - model and tokenizer pinned to `7ae5576…`;
   - prefix caching off;
@@ -136,17 +141,21 @@ TTFT/TPOT/E2E are per-run medians across requests. Shares, server phases, and
 | fwd | C16 | 307.0 (280.0–308.5) | 296.9 | 17.57 | 858.9 | 582.8 | 0.348 / 0.305 | 114.2 / 130.9 / 559.7 | 5.46 / 48.7 |
 | fwd | C32 | 278.6 | 430.9 | 50.34 | 1892.7 (1810.4–1892.8) | 555.1 | 0.238 / 0.198 | 188.2 / 153.7 / 1384.8 | 54.99 / 58.2 |
 | rev | C32 | 278.5 | 430.2 | 50.47 | 1906.4 (1806.5–1909.5) | 552.8 | 0.236 / 0.197 | 188.9 / 153.3 / 1392.4 | 54.93 / 58.3 |
-| rev | C16 | 307.9 | 296.3 | 17.53 | 858.9 | 582.3 | 0.346 / 0.304 | 114.5 / 131.0 / 561.5 | 5.46 / 48.3 |
+| rev | C16 | 307.8 | 296.3 | 17.53 | 858.9 | 582.3 | 0.346 / 0.304 | 114.5 / 131.0 / 561.5 | 5.46 / 48.3 |
 | rev | C8 | 218.3 | 215.3 | 8.54 | 489.4 | 516.3 | 0.445 / 0.393 | 59.1 / 116.6 / 270.4 | 4.91 / 45.4 |
 
-At C16 and C32 the per-run *medians* of TTFT and E2E are unstable. Requests arrive
-in waves of the concurrency limit, so the distributions are multimodal. For example,
-C32 median TTFT is 278 ms while the mean is 431 ms and p90 is about 1,150 ms. The
-means and the shares (which are mean-based) are stable across repetitions and orders.
+At C16 and C32, requests arrive in waves of the concurrency limit, so the
+distributions are multimodal and some per-run *medians* are unstable: forward C16
+median TTFT ranges from 280.0 to 308.5 ms, and C32 median E2E from 1,806.5 to
+1,909.5 ms across both orders. Medians also misrepresent these distributions. C32
+median TTFT is 278 ms while the mean is 431 ms and p90 is about 1,100 ms. The means
+and the shares (which are mean-based) are stable across repetitions and orders.
 
 ![Phase C crossover: throughput, inter-token latency, and pre-first-token share against concurrency](figures/milestone3-phase-c-crossover.png)
 
-*Throughput, inter-token latency, and the pre-first-token share against concurrency.*
+*Throughput, inter-token latency, and the pre-first-token share against concurrency.
+The C1 points, and six of the twelve C8 points, are from the `off-before` and
+`off-after` contention series.*
 
 ### Part 2: GPU contention (`prefill_heavy`, C1 and C8)
 
@@ -186,7 +195,7 @@ At duty 0.25 the changes are about half as large.
 | 2 | Queue at C32 > 4× queue at C8 | 188 / 59 ms = 3.2× (1.9× at C16) | **Not confirmed** |
 | 3 | TPOT ≥ ~8.3 ms; ITL p99 > 40 ms | TPOT 17.6 and 50.4 ms; p99 48.7 and 58.2 ms | **Confirmed** |
 | 4 | C32 throughput < 1.5× C8 | 1.07×; it peaks at C16 (1.13×) | **Confirmed** |
-| 5 | C8 anchor reproduces Phase B within 5% (E2E, throughput) | E2E within 0.5% (488.2/489.4 vs 489.2/486.8 ms); throughput within 0.5% | **Confirmed** |
+| 5 | C8 anchor reproduces Phase B within 5% (E2E, throughput) | E2E within 0.6% (488.2/489.4 vs 489.2/486.8 ms); throughput within 0.5% | **Confirmed** |
 
 ### Part 2: GPU contention
 
@@ -194,9 +203,9 @@ At duty 0.25 the changes are about half as large.
 |---|---|---|---|
 | 1 | Sham within the `off-before` range or 2% | E2E within 0.05%; C8 TTFT +0.9%; throughput identical | **Confirmed** |
 | 2 | Monotonic dose response (E2E, TTFT, TPOT up; throughput down) at C1 and C8 | Monotonic for all four metrics in both conditions | **Confirmed** |
-| 3 | Server prefill and decode both rise; at C8 queue rises proportionally more than prefill | Both rise. At C8 queue rises *less* than prefill (+5.6% vs +17.0%) | **Mixed:** first part confirmed, second not |
+| 3 | Server prefill and decode both rise; at C8 queue rises proportionally more than prefill | Both rise. At C8 queue rises *less* than prefill (+5.6% vs +17.0%) | **Mixed:** first part confirmed, second part falsified |
 | 4 | Client − server TTFT gap within 2 ms of `off-before` | +0.3 ms (C1) and +0.5 ms (C8) | **Confirmed** |
-| 5 | Mean GPU utilization changes < 5 points (`off-before` → `active-050`) | +1.4 (C1), +6.0 (C8); the off and sham series themselves vary by ±3 points | **Mixed:** within noise at C1, just over at C8 |
+| 5 | Mean GPU utilization changes < 5 points (`off-before` → `active-050`) | +1.4 (C1), +6.0 (C8); the off and sham series themselves span about 3.5 points | **Not confirmed at C8; confirmed at C1** |
 | 6 | (Secondary) the pre-first-token share at C8 rises under contention | 0.448 → 0.441 → 0.435 (slightly down) | **Not confirmed** |
 | 7 | `off-after` within 2% of `off-before` (E2E, throughput) | Within 0.05% | **Confirmed** |
 
@@ -205,7 +214,7 @@ At duty 0.25 the changes are about half as large.
 - **Where the extra latency goes past saturation (post hoc; plausible, not proven).**
   From C8 to C32, server decode time per request grows from 271 to 1,385 ms. For 31
   generation steps that is ~8.7 → 44.7 ms per step, and the median inter-token
-  interval jumps from 4.9 to 55 ms between C16 and C32.
+  interval jumps from 5.5 ms at C16 to 55 ms at C32 (4.9 ms at C8).
   - With chunked prefill (enabled), new requests' prompt chunks share iterations with
     ongoing decodes, so a generation step's duration is set by the prefill tokens it
     carries.
@@ -231,26 +240,30 @@ At duty 0.25 the changes are about half as large.
   C16, then falls 5% at C32. Queue time grows sub-linearly with concurrency (1.9× and
   3.2×) because the scheduler admits more requests into running batches rather than
   holding them waiting. Per-step time absorbs the cost.
-- **Contention signature.** GPU contention and added load leave different
-  fingerprints:
+- **Contention signature.** Under closed-loop load, GPU contention and added load
+  leave different fingerprints. The load row compares C8 and C16 within each
+  crossover series.
 
   | | C1 | C8 queue | C8 prefill / decode | Client−server gap |
   |---|---|---|---|---|
-  | Contention (duty 0.5) | slows (+13% E2E) | ~flat (+6%) | +17% / +18% | unchanged |
-  | Load (C8 → C16) | unaffected | +88% | +12% / +107% | +2.8 ms |
+  | Contention (duty 0.5) | slows (+13% E2E) | +6% | +17% / +18% | unchanged |
+  | Load (C8 → C16) | n/a | +93–94% | +12% / +107–108% | +2.3–2.8 ms |
+
+  The small queue rise under contention is the falsified half of prediction 3, which
+  expected queue time to rise proportionally more than prefill.
 
   At C1, contention slows prefill (+23%) about twice as much as decode (+11%). That
   fits a compute-bound matmul generator competing mostly with compute-bound prefill,
   with memory-bound decode less exposed. No published source tests this asymmetry,
   so it remains this study's observation.
 
-  The flat queue is partly a property of the load generator. With closed-loop load
+  The small queue rise is partly a property of the load generator. With closed-loop load
   (`--max-concurrency`), requests in flight are capped, so slower service cannot
   build an unbounded queue. Under open-loop arrivals, queueing models predict that
   queue time grows with service time [P2 §3.1]. The signature should therefore be
   stated as "under closed-loop load"; an open-loop test would check it.
 - **GPU utilization is not a reliable detector.** The `nvidia-smi` percentage moves by
-  1–6 points under contention that costs 13–15% in E2E, and it varies by about 3
+  1–6 points under contention that costs 13–15% in E2E, and it varies by about 3.5
   points between identical off and sham series. The generator's own log (achieved and
   kernel duty) and the server phase times identify the contention.
 - **Front end unaffected by GPU contention, but not by load.** The client–server
@@ -275,16 +288,17 @@ synthetic matmul load.
 | Throughput saturates between C8 and C16; queue time grows sub-linearly | **Supports** | Throughput "generally saturates around the maximum batch size" while latency keeps rising [B8, B9]. Past the compute-bound point, more users "just delays everyone with no benefit of throughput" [B19, see also B18]. Step time "grows roughly with B" above saturation [B3]. Sub-linear queue growth is expected under closed-loop load, which caps requests in flight [P3, B7]. |
 | Past saturation the cost moves into per-step time; a phase-share metric cannot show it | **Supports** | Mixed batches make step time rise with prefill tokens: "generation stalls", and time between tokens up to 28.3× higher [P1 §1, §4.2–4.3]. "Adding a single prefill job to a batch of decoding requests significantly slows down both" [P2 §2.3]. vLLM V1 schedules prefill and decode within one token budget, with no prefill/decode distinction [B1, B3]. Its documentation states that smaller `max_num_batched_tokens` "achieve better ITL because there are fewer prefills slowing down decodes" [B4]. Averaged metrics such as TPOT "hide jitters in token generation" [R1 §3.1], matching the conclusion that per-step distributions are needed. |
 | Closed-loop waves make per-run medians unstable | **Qualifies** | Closed-loop load, sending requests in "rounds", and coordinated omission are all documented [P3, B7, B17, B20]. No source reports multimodal medians specifically; that is this study's observation. Closed-loop testing also understates tails [B20], and common metrics can be gamed [R2]. |
-| GPU contention: C1 slows, queue flat, prefill slows more than decode at C1 | **Qualifies** | Time-slicing gives "an equal share of time to all GPU processes" with no isolation [B13], at "a cost for context-switching" that brings "increased latency, jitter" [B14]. This fits the similar prefill and decode slowdowns at C8. Interference from co-executing workloads on inference tails is documented [R3, R4]. MPS would run the kernels concurrently instead of time-slicing them [B12]. No source covers the prefill > decode asymmetry at C1, and the flat queue is partly a closed-loop effect (see interpretation) [P2 §3.1]. |
+| GPU contention: C1 slows, C8 queue rises only 6%, prefill slows more than decode at C1 | **Qualifies** | Time-slicing gives "an equal share of time to all GPU processes" with no isolation [B13], at "a cost for context-switching" that brings "increased latency, jitter" [B14]. This fits the similar prefill and decode slowdowns at C8. Interference from co-executing workloads on inference tails is documented [R3, R4]. MPS would run the kernels concurrently instead of time-slicing them [B12]. No source covers the prefill > decode asymmetry at C1, and the small queue rise is partly a closed-loop effect (see interpretation) [P2 §3.1]. |
 | `nvidia-smi` utilization is a weak signal | **Supports** | NVML utilization is the "percent of time … during which one or more kernels was executing" [B10], so the generator's kernels count as busy time too. DCGM's SM activity, "0.8 or greater is necessary, but not sufficient", is the documented finer metric [B11]. Practitioners call the utilization counter "misleading" [B15, B16]. |
-| Client–server TTFT gap grows with load and is flat under GPU contention | **Supports, with a caveat** | vLLM's TTFT starts when tokenization begins in the frontend, while queue time is measured in the engine core, which "the frontend does not have visibility into" [B5]. Tokenization, detokenization, and streaming run outside the engine core [B1]. Frontend cost has been large: the HTTP server was "33% of the total execution time" before the V1 process split [B2], and "the API server process can become a bottleneck" [B6]. Caveat: the client shares the host's CPUs, and CPU interference can degrade vLLM "by up to two orders of magnitude" [R5]. |
+| Client–server TTFT gap grows with load and is flat under GPU contention | **Supports, with a caveat** | vLLM's TTFT starts when tokenization begins in the frontend, while queue time is measured in the engine core, which "the frontend does not have visibility into" [B5]. Tokenization, detokenization, and streaming run outside the engine core [B1]. Frontend cost has been large: the HTTP server was "33% of the total execution time" before the V1 process split [B2], and "the API server process can become a bottleneck" [B6]. Caveat: the client shares the host's CPUs, and under CPU interference existing serving systems "degrade by up to two orders of magnitude" [R5]. |
 
 **Taken together:** the saturation and per-step findings match established results. This
 study adds measurements on a small model with a bandwidth-limited workstation GPU, and
 shows that a pre-registered phase-share metric misses the shift. The contention
 signature is only partly anticipated. The C1 prefill/decode asymmetry and the
-utilization blind spot under a co-located load are this study's observations. The flat
-queue should be reported as specific to closed-loop load. The planned chunk-budget
+utilization blind spot under a co-located load are this study's observations. The small
+queue rise, which falsified the second half of prediction 3, should be reported as
+specific to closed-loop load. The planned chunk-budget
 intervention is the test vLLM's own documentation implies [B4].
 
 **Peer-reviewed**
@@ -329,13 +343,18 @@ intervention is the test vLLM's own documentation implies [B4].
 - The probe's primary metric was not suited to chunked-prefill scheduling, as above.
   The ITL-based reading of the shift is exploratory and needs its own pre-registered
   test, for example reporting per-step time or prefill tokens per iteration directly.
-- At C16 and C32, per-run medians are unstable because requests arrive in waves. Mean
+  vLLM's iteration-token histogram (`vllm:iteration_tokens_total`) cannot supply the
+  latter: it credits a request's whole prompt at its first token, so it does not
+  record per-step prefill chunks. The
+  [Phase D report](milestone3-20261006T022744Z-phase-d.md) found this.
+- At C16 and C32, some per-run medians (forward C16 TTFT, C32 E2E) are unstable
+  because requests arrive in waves. Mean
   and percentile summaries are more reliable there. Closed-loop load also has a
   documented bias of its own: coordinated omission understates tail latency [B20,
   P3]. Percentiles from these runs are therefore not artifact-free either.
 - The client runs on the server's 4 vCPUs. The growing client–server TTFT gap
   therefore cannot separate client-side overhead from API-server overhead. Host CPU
-  contention is known to hurt vLLM badly [R5].
+  contention is known to hurt existing serving systems badly [R5].
 - Contention ran in a fixed dose order. The sham/recovery bracketing and the
   monotonic pattern argue against drift, but order and dose are not fully separated.
 - One host and one model. Sampler overhead is still unmeasured (no telemetry-off
@@ -367,19 +386,23 @@ intervention is the test vLLM's own documentation implies [B4].
 - **Make the bottleneck-shift test match the scheduler.** The chunk-budget intervention
   below is the test vLLM's own documentation implies [B4]. Add DCGM SM activity
   [B11], if available, alongside `nvidia-smi` utilization, and consider an
-  open-loop arrival condition to check the flat-queue signature [P2, P3].
+  open-loop arrival condition to recheck the small queue rise [P2, P3].
   - Pre-register a per-iteration metric: ITL p50 or step-time distribution vs
     concurrency, with the saturation point (C8–C16) as the predicted transition.
   - Optionally, vLLM's iteration-level statistics, if they can be exposed cheaply.
+    The iteration-token histogram does not qualify (see the limitations).
   - This would fit Milestone 5 (workload shape) or a short Milestone 3 addendum
     before more data.
 - **Summarize the solid results in the README:**
   - a saturation and per-step shift between C8 and C32;
-  - a contention signature distinct from load (C1 sensitivity, flat queue,
-    prefill-first slowdown);
+  - a contention pattern that differs from added load under closed-loop load (C1
+    sensitivity and a prefill-first slowdown at C1); the small queue rise at C8
+    falsified the second half of prediction 3;
   - utilization as a weak signal.
-- **Milestone 3 status:** Phases B and C are complete. Mark Milestone 3 complete, with
-  the bottleneck-shift question carried forward.
+- **Milestone 3 status:** Phases B and C are complete. Phase D, pre-registered
+  afterwards, tested the per-step explanation with a concurrency sweep and a
+  token-budget intervention; see the
+  [Phase D report](milestone3-20261006T022744Z-phase-d.md).
 
 ## Artifact record
 

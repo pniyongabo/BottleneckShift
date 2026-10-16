@@ -2,8 +2,9 @@
 
 ## Result
 
-The pre-registered shift did not occur. Decode time dominates end-to-end latency
-in both regimes, including `prefill_heavy` (2048 input / 32 output tokens).
+The pre-registered shift did not occur. Decode time dominates each request's
+end-to-end latency in both regimes, including `prefill_heavy` (2048 input / 32 output
+tokens).
 
 Concurrency 8 does change what grows in each regime:
 
@@ -15,7 +16,9 @@ Concurrency 8 does change what grows in each regime:
   TPOT rises ~10%, there is no queueing, and decode stays ~99% of server time.
 
 So `prefill_heavy` at C8 moves toward a crossover, with pre-first-token time
-approaching parity with decode, but on this model and GPU it does not cross.
+approaching parity with decode, but on this model and GPU it does not cross. At C8,
+much of a request's decode time is spent in engine steps that also carry other
+requests' prefill chunks (see Interpretation).
 
 ## Terms used in this report
 
@@ -107,41 +110,43 @@ and server-side ((queue + prefill) / (queue + inference)).
 
 | Regime | Order | Cond. | TTFT (ms) | TPOT (ms) | E2E (ms) | Output tok/s | Server queue / prefill / decode (ms) | Pre-1st share, client / server | GPU util |
 |---|---|---|---:|---:|---:|---:|---:|---:|---:|
-| prefill_heavy | fwd | C1 | 54.37 (54.18–54.43) | 3.87 | 174.50 (174.27–174.65) | 183.3 | 0.02 / 40.3 / 122.5 | 0.310 / 0.247 | 89% |
+| prefill_heavy | fwd | C1 | 54.37 (54.18–54.43) | 3.87 | 174.50 (174.26–174.65) | 183.3 | 0.01 / 40.3 / 122.5 | 0.310 / 0.247 | 89% |
 | prefill_heavy | fwd | C8 | 220.59 (219.54–221.89) | 8.33 | 489.18 (489.14–489.35) | 516.0 | 61.8 / 116.6 / 268.9 | 0.448 / 0.399 | 94% |
 | prefill_heavy | rev | C1 | 54.29 (53.96–54.32) | 3.88 | 174.27 (174.19–174.64) | 183.5 | 0.01 / 40.1 / 122.6 | 0.309 / 0.247 | 92% |
-| prefill_heavy | rev | C8 | 218.82 (218.42–219.56) | 8.35 | 486.83 (486.58–487.14) | 518.4 | 60.7 / 115.9 / 268.0 | 0.448 / 0.397 | 97% |
-| decode_heavy | fwd | C1 | 12.82 (12.74–12.84) | 3.86 | 1984.60 (1982.66–1984.76) | 258.3 | 0.01 / 8.6 / 1969.3 | 0.007 / 0.004 | 99% |
-| decode_heavy | fwd | C8 | 27.47 (27.44–28.46) | 4.25 | 2196.51 (2195.11–2199.26) | 1667.9 | 0.02 / 13.3 / 2167.6 | 0.013 / 0.006 | 98% |
+| prefill_heavy | rev | C8 | 218.82 (218.42–219.55) | 8.35 | 486.83 (486.58–487.14) | 518.4 | 60.7 / 115.9 / 268.0 | 0.448 / 0.397 | 97% |
+| decode_heavy | fwd | C1 | 12.82 (12.74–12.84) | 3.86 | 1984.60 (1982.66–1984.75) | 258.3 | 0.01 / 8.6 / 1969.3 | 0.007 / 0.004 | 99% |
+| decode_heavy | fwd | C8 | 27.46 (27.44–28.46) | 4.25 | 2196.51 (2195.11–2199.26) | 1667.9 | 0.02 / 13.3 / 2167.6 | 0.013 / 0.006 | 98% |
 | decode_heavy | rev | C1 | 12.51 (12.49–12.66) | 3.86 | 1984.57 (1983.30–1984.65) | 258.3 | 0.01 / 8.6 / 1969.4 | 0.006 / 0.004 | 99% |
 | decode_heavy | rev | C8 | 27.84 (27.43–29.22) | 4.24 | 2194.66 (2193.47–2194.76) | 1669.7 | 0.02 / 13.4 / 2165.0 | 0.013 / 0.006 | 98% |
 
 Inter-token latency (median across repetitions of each run's p50 / p99):
 
-| Regime | C1 | C8 |
-|---|---|---|
-| prefill_heavy | 3.92 / 4.45 ms | 4.90 / 45.62 ms |
-| decode_heavy | 3.85 / 4.32 ms | 4.24 / 4.88 ms |
+| Regime | Order | C1 | C8 |
+|---|---|---|---|
+| prefill_heavy | fwd | 3.92 / 4.44 ms | 4.90 / 45.62 ms |
+| prefill_heavy | rev | 3.93 / 4.50 ms | 4.89 / 44.87 ms |
+| decode_heavy | fwd | 3.85 / 4.32 ms | 4.24 / 4.88 ms |
+| decode_heavy | rev | 3.85 / 4.35 ms | 4.24 / 4.87 ms |
 
 ## Predicted signatures vs observed
 
 | Prediction | `prefill_heavy`, C1 → C8 | `decode_heavy`, C1 → C8 |
 |---|---|---|
 | TTFT | rises strongly; **confirmed** (54 → 220 ms, 4.1×) | small absolute rise; **confirmed** (+15 ms) |
-| Pre-first-token share of E2E | high at both; **mixed**: 31% → 45% (client); high relative to decode-heavy, but never dominant | low at both; **confirmed** (≤ 1.3%) |
-| TPOT / ITL | rises, ITL tail widens; **confirmed** (TPOT 2.15×; ITL p99 4.5 → 45.6 ms) | modest rise, like Milestone 2's +12%; **confirmed** (+10%) |
+| Pre-first-token share of E2E | high at both; **not confirmed**: 31% → 45% (client), 25% → 40% (server); higher than in `decode_heavy` but below half at both levels | low at both; **confirmed** (≤ 1.4% in every run) |
+| TPOT / ITL | rises, ITL tail widens; **confirmed** (TPOT 2.15×; ITL p99 4.4–4.5 → 44.9–45.6 ms) | modest rise, like Milestone 2's +12%; **confirmed** (+10%) |
 | Throughput gain | well below ~6.5×; **confirmed** (2.8×) | near or above ~6.5×; **confirmed** (6.46×) |
 | Server queue time | rises at C8; **confirmed** (~0 → 61 ms) | small at both; **confirmed** (≤ 0.02 ms) |
 | Server prefill time | dominant component; **not confirmed**: decode (122 / 269 ms) exceeds prefill (40 / 117 ms) | minor; **confirmed** |
 | Server decode time | minor; **not confirmed** | dominant; **confirmed** (~99%) |
-| GPU utilization | high during prefill bursts; consistent (89–97% mean) | high and steady; **confirmed** (98–99%) |
+| GPU utilization | high during prefill bursts; **not testable**: the 200 ms sampler cannot resolve ~40 ms prefills (run means 89–97%) | high and steady; **confirmed** (98–99%) |
 | Stable: zero errors, exact lengths, E2E reconstruction within 1 ms | **confirmed** | **confirmed** |
-| Stable: forward/reverse agreement within repetition ranges | mostly; C8 E2E differs by 0.5% (489.2 vs 486.8 ms) with non-overlapping ranges | **confirmed** |
+| Stable: forward/reverse agreement within repetition ranges | **not confirmed**: ranges do not overlap for C8 E2E (489.2 vs 486.8 ms, 0.5%), C8 throughput (516.0 vs 518.4 tok/s, 0.5%), C8 server prefill (116.6 vs 115.9 ms, 0.6%), C1 GPU utilization (89% vs 92%), and C1 server queue time (0.015 vs 0.014 ms) | **not confirmed**: ranges do not overlap for C1 TTFT (12.82 vs 12.51 ms, 2.5%), C8 TPOT (4.25 vs 4.24 ms, 0.2%), and C8 E2E (2196.5 vs 2194.7 ms, 0.1%) |
 
 The shift being tested was that the dominant component changes from pre-first-token
 time in `prefill_heavy` to decode in `decode_heavy`. It is not supported: decode
-dominates both. The second half, that concurrency amplifies different components in
-each regime, is supported:
+dominates per-request latency in both. The second half, that concurrency amplifies
+different components in each regime, is supported:
 
 * in `prefill_heavy`, C8 multiplies queue (~0 → 61 ms), prefill (2.9×) and decode
   (2.2×) time;
@@ -151,15 +156,29 @@ each regime, is supported:
 
 - **Why prefill_heavy is not prefill-dominated.** Prefilling 2048 tokens takes ~40 ms
   on this setup. The 31 decode steps take ~122 ms at C1, so even a 32-token output
-  outweighs the prefill. For pre-first-token time to dominate, this model and GPU
-  would need a longer input, a shorter output, or more concurrency. Milestone 5's
-  factorial is where that boundary can be mapped.
+  outweighs the prefill. At C1 each request runs alone, so its decode time is its own
+  decode work. For pre-first-token time to dominate, this model and GPU would need a
+  longer input, a shorter output, or more concurrency. Milestone 5's factorial is
+  where that boundary can be mapped.
 - **The C8 mechanism in prefill_heavy (plausible, not proven).** TPOT doubles and the
   ITL p99 rises to ~45 ms, about the time of one 2048-token prefill (~40 ms at C1).
-  Requests also wait ~61 ms in the queue. Together these fit decode steps that stall
-  behind other requests' prefills, with the GPU busy on prefill. Utilization (94–97%)
-  corroborates heavy use but does not identify the cause. A contention intervention
-  (Phase C) is the test.
+  Requests also wait ~61 ms in the queue. Under chunked prefill, the engine schedules
+  running decodes and new prompt chunks in the same step, within a 2048-token budget
+  on this GPU. A step that carries a large prompt chunk takes about as long as a
+  prefill, so every request decoding in that step sees a long inter-token gap. These
+  observations fit that pattern. Utilization (94–97%) corroborates heavy use but does
+  not identify the cause. A contention intervention (Phase C) is the test.
+- **What server decode time measures at C8.** A request's decode time runs from its
+  first token to its last. At C8 much of it is spent in steps that also carry other
+  requests' prefill chunks, so the per-request breakdown books much of the GPU's
+  prefill work as decode. An estimate from step counts: each C8 run has about 490
+  output iterations in 6.2 s. Assuming one long prefill-carrying step per prompt, and
+  the other ~390 steps at about the ITL p50 (4.9 ms), the decode-only steps account
+  for ~1.9 s. That leaves ~4.3 s for ~100 prefill-carrying steps, ~43 ms each, close
+  to the ITL p99. By this estimate about 70% of the run's time goes to steps carrying
+  prefill. The run time includes idle gaps, and the step count is the count of vLLM's
+  `vllm:iteration_tokens_total` histogram. Its token values are not used, because
+  they credit a request's whole prompt at its first token.
 - **decode_heavy scales almost linearly.** At C1 the GPU is already ~99% utilized, yet
   C8 delivers 6.5× throughput for +10% TPOT. Utilization alone therefore does not
   indicate saturation, which is why the protocol treats it as corroboration only.
@@ -188,7 +207,7 @@ Magnitudes are therefore not directly comparable; directions and mechanisms are.
 | Finding | Verdict | Evidence |
 |---|---|---|
 | C8 gives ~6.5× throughput for a small TPOT/E2E cost (Milestones 1–2; `decode_heavy`) | **Supports** | Decode is memory-bound, and batching amortizes weight loading [1, 6, 7]. "Batching boosts decode phase throughput immensely but has little effect on prefill throughput" [4, §3.1]. Batching the token phase "yields high throughput without any downside" [6, §III-D]. Iteration-level scheduling is the basis of these gains [2]. |
-| TTFT rises with concurrency | **Supports** | Adding decodes to a batch increases TTFT, and TTFT includes a queueing term that grows with load [5, §1, §3.1]. Chunked prefill trades higher TTFT for lower decode stalls [4, §5.4.2]. |
+| TTFT rises with concurrency | **Supports** | Adding decodes to a batch increases TTFT, and TTFT includes a queueing term that grows with load [5, §1, §3.1]. Chunking prefills raises TTFT slightly, while batching long prefills with decodes without chunking causes generation stalls [4, §5.4.2]. |
 | Prefix caching lowered TTFT (Milestone 1 vs 2) | **Supports the direction** | Reusing a shared prefix removes redundant prefill and lowers first-token latency; higher hit rates give lower latency [1, §4.4; 8, §6.2–6.3]. Our comparison is confounded with sampling and warm-up changes, so only the direction is comparable. |
 | Decode dominates E2E even with 2048-token prompts | **Supports** | The generation phase is "responsible for most portion of the latency of a single request" [1, §2.2]. In [6, §III-C], a 1500-token prompt phase takes as long as about 6 output tokens. Here a 2048-token prefill (~40 ms) takes about as long as ~10 decode steps, the same order of magnitude on a much smaller model. |
 | `prefill_heavy` C8: TPOT 2.2×, ITL p99 10×, queueing, only 2.8× throughput | **Supports** | Prefills scheduled between decode iterations cause "generation stalls" and P99 time-between-tokens spikes [4, §3.1–3.2]. A waiting prompt can "substantially increase the tail for TBT" [6, §II-D]. Adding a prefill to a decode batch slows both, and chunking alleviates but does not eliminate this [5, §2.3; 3; 9]. The closest setup, vLLM with Qwen3-0.6B on one A100, reports the same interference: long prefills delay active decodes [11]. |
@@ -221,8 +240,8 @@ literature.
 14. Z. Zhang et al., "TokTier: Exact Stateful CPU+GPU Tokenization for Agentic LLM Serving," arXiv 2607.29678, 2026. https://arxiv.org/abs/2607.29678
 15. A. Chandrasekar et al., "Identifying and Mitigating Systemic Measurement Bias in Production LLM Inference Benchmarks," arXiv 2605.24217, 2026. https://arxiv.org/abs/2605.24217
 
-Venues for references 10–15 are not given. They are cited as arXiv preprints because
-no peer-reviewed venue was confirmed.
+Venues for references 3, 9, and 10–15 are not given. They are cited as arXiv
+preprints because no peer-reviewed venue was confirmed.
 
 ## Limitations
 
@@ -235,8 +254,10 @@ no peer-reviewed venue was confirmed.
   findings are descriptive, not statistical generalizations.
 - GPU utilization is a 200 ms sampled percentage. Short runs (prefill_heavy C8,
   ~6 s) have ~30 samples, so their means are coarse.
-- Forward and reverse ran on the same VM about 10 minutes apart (see execution
-  notes); the small prefill_heavy C8 E2E order difference is retained.
+- Forward and reverse ran on the same VM. The `prefill_heavy` series were ~10.5
+  minutes apart (see execution notes) and the `decode_heavy` series ~1 minute apart.
+  The small order differences in both regimes are retained (see the forward/reverse
+  row above).
 
 ## Execution notes
 

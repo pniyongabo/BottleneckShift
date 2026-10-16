@@ -130,9 +130,8 @@ python scripts/validate_results.py \
 ```
 
 This command requires the raw result directories; they are intentionally not in this
-repository. For Milestone 1, the archive custodian reported running it on both extracted
-series: all 12 measured runs and 1,200 measured requests passed, with zero failures and
-exact configured token lengths. See the
+repository. For Milestone 1, it passes on both extracted series: all 12 measured runs and 1,200
+measured requests, with zero failures and exact configured token lengths. See the
 [Milestone 1 report](../reports/milestone1-20261001T205137Z.md) for its scope.
 
 ### Controlled follow-up protocol
@@ -205,5 +204,10 @@ python -m pip install -e '.[analysis]'   # matplotlib, for the figure
 python analysis/phases.py results/runs/SERIES-ID [...] \
   --summary results/figures/milestone3-summary.csv --output results/figures/milestone3.svg
 ```
+
+The step columns (`server_steps`, `tokens_per_step_mean`, `steps_over_*_share`,
+`server_step_ms`) come from `vllm:iteration_tokens_total`. Its count is output
+iterations, but its token values credit a request's whole prompt at its first token, so
+they do not measure per-step chunk sizes (see the [glossary](glossary.md)).
 
 `scripts/gpu_contention.py` can also be run by hand during a disposable shakedown.

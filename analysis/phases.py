@@ -78,8 +78,11 @@ def server_row(directory: Path) -> dict:
     row["dominant_component"] = "pre_first_token" if queue + prefill > decode else "decode"
     row["largest_phase"] = max((("queue", queue), ("prefill", prefill), ("decode", decode)),
                                key=lambda item: item[1])[0]
-    # vllm:iteration_tokens_total, when exposed. Counts output iterations; prompt tokens are
-    # credited when a request emits its first token (see prometheus.STEP_FAMILY).
+    # vllm:iteration_tokens_total, when exposed. Counts output iterations and credits a
+    # request's whole prompt at the iteration that emits its first token (see
+    # prometheus.STEP_FAMILY). tokens_per_step_mean and steps_over_*_share therefore do not
+    # measure per-step prefill chunks or the token budget. With 2048-token prompts,
+    # steps_over_1024_share is the share of iterations in which a prefill completed.
     steps = summary.get("steps")
     if steps and steps["count"]:
         row["server_steps"] = steps["count"]
@@ -118,6 +121,9 @@ def run_rows(root: Path) -> list[dict]:
             if row.get("server_steps"):
                 # Mean time per output iteration over the benchmark window (includes idle gaps).
                 row["server_step_ms"] = document["duration"] * 1000 / row["server_steps"]
+            # Client mean TTFT minus server queue + prefill. This differs from client minus
+            # server TTFT: it also includes tokenization and request handling before the
+            # engine's queue timer starts.
             row["ttft_gap_ms"] = row["client_ttft_mean_ms"] - (row["server_queue_ms"] + row["server_prefill_ms"])
             row["itl_gap_ms"] = (row["client_itl_mean_ms"] - row["server_itl_ms"]
                                  if row["client_itl_mean_ms"] is not None else None)
