@@ -21,7 +21,7 @@ summary percentiles default to `--percentile-metrics ttft,tpot,itl` and
 | **Median (in tables)** | Unless stated otherwise, the median across a run's requests, then the median of those values across the three repetitions. Ranges in parentheses are the minimum and maximum across repetitions. |
 | **Pre-first-token share** (*custom*) | The fraction of E2E latency spent before the first token. Client-side: Σ TTFT / Σ E2E over a run's requests. Server-side: (queue + prefill) / (queue + inference), from mean server phase times. |
 | **Dominant component** (*custom*) | "Pre-first-token" if mean server queue + prefill time exceeds mean decode time; otherwise "decode". |
-| **Client − server TTFT gap** (*custom*) | Client mean TTFT minus the server's own TTFT measurement. It covers the front end (HTTP, tokenization, streaming) and, here, client overhead on the shared host. |
+| **Client − server TTFT gap** (*custom*) | Client mean TTFT minus the server's own TTFT measurement. vLLM starts that timer when tokenization begins, so the gap covers HTTP and streaming overhead and, here, client overhead on the shared host. The `ttft_gap_ms` column of `analysis/phases.py` is a different quantity: it subtracts server queue and prefill time, so it also includes tokenization and request handling before the engine queue. |
 
 ## Server-side phases
 
@@ -37,7 +37,7 @@ scrapes taken before and after the run.
 | **Chunked prefill** | vLLM's default scheduling: a long prompt's prefill is split into chunks that share each batch step with other requests' decode work, within a token budget (`max_num_batched_tokens`). |
 | **Generation stall** | A decode step slowed because prefill work was scheduled in the same or an intervening step. |
 | **Engine step** | One scheduler iteration of the vLLM engine. It processes up to `max_num_batched_tokens` tokens: one new token per decoding request plus prompt chunks. vLLM does not export per-step chunk sizes. |
-| **Iteration tokens** (*server*) | The `vllm:iteration_tokens_total` histogram, observed once per output-producing iteration. In vLLM 0.29.0 each value is the full prompt length of requests that emitted their first token in that iteration, plus tokens generated. It is not tokens computed per step: a request's whole prompt is credited at its first token. So with 2048-token prompts, "share over 512/1024/2048" is the share of iterations in which a prefill completed, and "share over 8192" the share in which at least four did (Phase D report). |
+| **Iteration tokens** (*server*) | The `vllm:iteration_tokens_total` histogram, observed once per output-producing iteration. In vLLM 0.29.0 each value is the computed prompt tokens (the full prompt length, since prefix caching is off) of requests that emitted their first token in that iteration, plus tokens generated. It is not tokens computed per step: a request's whole prompt is credited at its first token. So with 2048-token prompts, "share over 512/1024/2048" is the share of iterations in which a prefill completed, and "share over 8192" the share in which at least four did (Phase D report). |
 | **Server iteration time** (*custom*, column `server_step_ms`) | Benchmark duration divided by output iterations in the run: the mean time per iteration, including idle gaps. |
 
 ## Load and experimental design
@@ -54,7 +54,7 @@ scrapes taken before and after the run.
 | **Series** | One server start running a config's warm-ups and all of its measured runs, in a fixed condition order, with one `manifest.json`. |
 | **Pair / session ID** | The ID shared by the series of one GPU session, e.g. `milestone3c-20261003T201214Z`. Series IDs append a name, e.g. `…-off-before`. |
 | **Forward / reverse** | The same conditions run in opposite orders (for example C1 then C8, versus C8 then C1), to expose order and history effects. |
-| **Warm-up** | Unmeasured runs before the measured runs, at each concurrency level, so that model loading, compilation, and allocator effects are excluded from measurements. |
+| **Warm-up** | Unmeasured runs before the measured runs, so that model loading, compilation, and allocator effects are excluded from measurements. From Milestone 2 onward they run at each concurrency level; Milestone 1 warmed only C1. |
 | **Cooldown** | A 15 s pause between runs. |
 | **Anchor** | A condition repeated from an earlier session (e.g. `anchor_c8`), used to check that results reproduce across sessions. |
 | **Token-budget intervention** | Phase D: setting `max_num_batched_tokens` to 512, 2048, or 8192 to change how many prompt tokens can share a step with decodes. Series `budget-0512`, `budget-8192`, and `budget-2048-before`/`-after`, each at C8 and C32 (`budget_c8`, `budget_c32`). |
@@ -186,7 +186,7 @@ experiment configs set. Runner defaults come from `scripts/run_experiment.py`,
 - **[P#]**: peer-reviewed paper.
 - **[R#]**: arXiv preprint, not peer-reviewed.
 - **[B#]**: engineering blog or documentation, not peer-reviewed.
-- **Numbered references [1]–[15]** in the Phase B report mix these kinds, and its
-  reference list marks preprints.
+- **Numbered references [1]–[15]** in the Phase B report mix these kinds. Its
+  reference list gives no venue for preprints (references 3, 9, and 10–15).
 - **Conference abbreviations:** OSDI, SOSP, NSDI, ISCA, MLSys, and NeurIPS are
   peer-reviewed venues.

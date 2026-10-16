@@ -21,36 +21,40 @@ a request dominates, and when that changes, decides what to tune:
 
 - **Interactive chat and coding assistants.** Users feel both the wait for the first
   token and how smoothly tokens stream. Under load, the delay moves into per-step
-  generation, and the scheduler's token budget trades median against tail latency
-  (finding 2).
+  generation, and the scheduler's token budget shifts that cost between median and tail
+  latency (finding 2).
 - **Long-prompt workloads such as retrieval-augmented generation.** A workload that
   looks prefill-heavy can still be dominated by decode (finding 1).
 - **Shared GPUs.** Multi-tenant clusters co-locate work with MPS or time slicing
   [[8]](#related-work). A co-located job slows inference in ways that GPU utilization
   barely shows (finding 3).
-- **Capacity planning and autoscaling.** The concurrency at which throughput saturates
-  depends partly on a scheduler default, so it's a configuration choice, not a fixed
-  hardware limit (finding 2).
+- **Capacity planning and autoscaling.** Throughput at high concurrency depends on the
+  scheduler's token budget: at 32 requests, raising it from the default 2048 to 8192
+  gave 18% more throughput (finding 2).
 
 ## Findings so far
 
 All on one GPU with a 0.5B model (Qwen2.5-0.5B-Instruct on an RTX A4000).
 
-1. **Decode dominates end-to-end latency, even with long prompts.** With 2048-token
-   prompts and 32-token outputs, prefill takes about 40 ms and the 31 generation steps
-   about 122 ms. ([Phase B](reports/milestone3-20261003T180358Z-phase-b.md))
+1. **Decode dominates each request's end-to-end latency, even with long prompts.** With
+   2048-token prompts and 32-token outputs, a request running alone spends about 40 ms
+   in prefill and about 122 ms in its 31 generation steps. At 8 concurrent requests,
+   much of a request's decode time is spent in steps that also carry other requests'
+   prefill chunks. ([Phase B](reports/milestone3-20261003T180358Z-phase-b.md))
 2. **Past saturation, added latency moves into per-step time, not into the wait for the
    first token.** From 8 to 32 concurrent requests, median inter-token latency (ITL)
    rises from 4.9 to 55 ms, while the share of latency before the first token falls
    from 0.44 to 0.24, against the pre-registered prediction. Changing vLLM's per-step
    token budget reshapes this cost: at 32 requests, 8192 tokens gives a 7 ms median ITL
    and 18% more throughput but a 169 ms p99, while 512 evens out ITL but triples TTFT.
+   The pre-registered test did not support a step-size explanation of this effect.
    ([Phase C](reports/milestone3-20261003T201214Z-phase-c.md),
    [Phase D](reports/milestone3-20261006T022744Z-phase-d.md))
-3. **GPU contention leaves a signature distinct from added load.** A co-located process
-   at a 50% duty cycle costs 13–15% end-to-end latency. It slows single requests too,
-   leaves queueing flat, and slows prefill more than decode, while `nvidia-smi`
-   utilization moves only 1–6 points.
+3. **Under closed-loop load, GPU contention looks different from added load.** A
+   co-located process at a 50% duty cycle costs 13–15% end-to-end latency. It slows
+   single requests too and, with one request at a time, slows prefill more than decode,
+   while `nvidia-smi` utilization moves only 1–6 points. At 8 requests, queue time rose
+   only 6%, against the pre-registered prediction that it would rise more than prefill.
    ([Phase C](reports/milestone3-20261003T201214Z-phase-c.md))
 
 ![Phase C crossover: throughput, inter-token latency, and pre-first-token share against concurrency](reports/figures/milestone3-phase-c-crossover.png)
@@ -61,18 +65,20 @@ More figures, including the contention series: [`reports/figures/`](reports/figu
 
 ## Method
 
-- **Pre-registration.** Each protocol, with numbered predictions and falsification
-  criteria, is merged before its data are collected
-  ([`experiments/`](experiments/roadmap.md)). Every report scores every prediction,
-  including the ones that failed.
-- **One factor at a time,** in forward and reverse order, with three repetitions, a
-  pinned model revision, prefix caching off, and explicit sampling.
-- **Three views of every run:** client request timings, vLLM's server-side `/metrics`
-  histograms (queue, prefill, decode), and GPU/CPU telemetry.
+- **Pre-registration.** Each protocol is merged before its data are collected
+  ([`experiments/`](experiments/roadmap.md)), and every report scores every prediction,
+  including the ones that failed. Milestones 1 and 2 state expected signatures;
+  numbered predictions and falsification criteria start with Milestone 3.
+- **One factor at a time,** in forward and reverse order, with three repetitions. From
+  Milestone 2 onward, runs use a pinned model revision, prefix caching off, and
+  explicit sampling.
+- **Three views of every run from Milestone 3 onward:** client request timings, vLLM's
+  server-side `/metrics` histograms (queue, prefill, decode), and GPU/CPU telemetry.
 - **Validation before analysis.** Request counts, failures, token lengths, server
   counts, and telemetry coverage are checked, and analysis refuses an unvalidated
   series. Raw data are archived with checksums.
-- **Controls for interventions:** a sham condition and a recovery baseline.
+- **Controls for interventions (from Milestone 3 Phase C):** a sham condition and a
+  recovery baseline.
 
 ## Related work
 
@@ -86,8 +92,8 @@ More figures, including the contention series: [`reports/figures/`](reports/figu
 4. Agrawal et al., [Sarathi-Serve](https://arxiv.org/abs/2403.02310), OSDI 2024: chunked
    prefill and the per-step token budget. Finding 2 measures that trade-off directly.
 5. Agrawal et al., [Etalon](https://arxiv.org/abs/2407.07000), 2024: averaged metrics
-   such as TPOT hide jitter. Here, median and tail ITL rank the token budgets in
-   opposite orders.
+   such as TPOT hide jitter. Here, the token budget with the best median ITL has the
+   worst p99.
 6. Dean and Barroso, [The Tail at Scale](https://doi.org/10.1145/2408776.2408794), CACM
    2013: why tail latency, not the average, shapes user experience.
 7. Hoefler and Belli,
