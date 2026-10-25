@@ -19,7 +19,7 @@ from urllib.request import urlopen
 REPO = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO / "src"))
 
-from bottleneckshift import contention, prometheus, telemetry  # noqa: E402
+from bottleneckshift import contention, prometheus, telemetry, vllm_steplog  # noqa: E402
 from bottleneckshift.config import load_config  # noqa: E402
 from bottleneckshift.manifest import environment  # noqa: E402
 
@@ -67,6 +67,13 @@ def benchmark_command(config: dict, max_concurrency: int, output_dir: Path,
     if request_id_prefix is not None:
         command += ["--request-id-prefix", request_id_prefix]
     return command
+
+
+def server_env(config: dict, root: Path) -> dict | None:
+    """Extra server environment: the opt-in per-step scheduler log (Milestone 5)."""
+    if not config.get("telemetry", {}).get("step_log"):
+        return None
+    return {vllm_steplog.ENV: str(root / "steps.jsonl")}
 
 
 def request_id_prefix(config: dict, root: Path, condition: str, repetition: int | None) -> str | None:
@@ -361,6 +368,8 @@ def main() -> int:
                                           for name, command, env, path in sampler_specs(config, root)}
         if contention_command(config, root):
             view["contention_command"] = contention_command(config, root)
+        if server_env(config, root):
+            view["server_env"] = server_env(config, root)
         print(json.dumps(view, indent=2))
         return 0
 
@@ -399,6 +408,9 @@ def main() -> int:
                 "protocol_controls": protocol_controls,
                 "active_run": None, "config": config, "server_command": server_command(config),
                 "environment": environment(REPO), "preflight": checks, "runs": []}
+    extra_env = server_env(config, root)
+    if extra_env:
+        manifest["step_log"] = {"path": extra_env[vllm_steplog.ENV]}
     manifest_path = root / "manifest.json"
     write_json(manifest_path, manifest)
     process = None
@@ -406,7 +418,8 @@ def main() -> int:
     try:
         with (root / "server.log").open("w") as log:
             process = subprocess.Popen(server_command(config), stdout=log, stderr=subprocess.STDOUT,
-                                       start_new_session=True, text=True)
+                                       start_new_session=True, text=True,
+                                       env={**os.environ, **extra_env} if extra_env else None)
             wait_until_healthy(config, process)
             instruments.start()
             for index, item in enumerate(plan):

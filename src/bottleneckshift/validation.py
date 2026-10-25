@@ -4,7 +4,7 @@ from datetime import datetime
 import json
 from pathlib import Path
 
-from bottleneckshift import contention, prometheus, telemetry
+from bottleneckshift import contention, prometheus, telemetry, vllm_steplog
 
 
 def _load(path: Path) -> dict:
@@ -155,6 +155,8 @@ def _validate_schema4(root: Path, manifest: dict, measured: list[dict]) -> dict:
             result["telemetry"][kind] = telemetry.coverage(samples, start, end, kind)
         except ValueError as exc:
             raise ValueError(f"{root}: {exc}") from exc
+    if enabled.get("step_log"):
+        result["step_log"] = _validate_step_log(root, manifest, measured)
     settings = config.get("contention", {"mode": "off"})
     if settings["mode"] != "off":
         record = manifest.get("contention", {})
@@ -169,3 +171,27 @@ def _validate_schema4(root: Path, manifest: dict, measured: list[dict]) -> dict:
         except ValueError as exc:
             raise ValueError(f"{root}: {exc}") from exc
     return result
+
+
+def _validate_step_log(root: Path, manifest: dict, measured: list[dict]) -> dict:
+    """Every measured run must have logged steps; prefill totals are reported, not enforced."""
+    path = manifest.get("step_log", {}).get("path")
+    if not path:
+        raise ValueError(f"{root}: step_log enabled but no step log recorded in the manifest")
+    try:
+        steps = vllm_steplog.read_steps(_locate(path, root).read_text())
+    except (OSError, ValueError) as exc:
+        raise ValueError(f"{root}: step log unreadable: {exc}") from exc
+    runs = []
+    for run in measured:
+        start = datetime.fromisoformat(run["started_at_utc"]).timestamp()
+        end = datetime.fromisoformat(run["finished_at_utc"]).timestamp()
+        window = [step for step in steps if start <= step["t_start"] <= end]
+        if not window:
+            raise ValueError(f"{root}: no logged steps during {run['condition']} repetition {run['repetition']}")
+        runs.append({"condition": run["condition"], "repetition": run["repetition"], "steps": len(window),
+                     "max_tokens": max(step["tokens"] for step in window),
+                     "prefill_tokens": sum(step["prefill_tokens"] for step in window),
+                     "expected_prefill_tokens": (manifest["config"]["workload"]["num_prompts"]
+                                                 * run["requested_input_tokens"])})
+    return {"steps": len(steps), "runs": runs}

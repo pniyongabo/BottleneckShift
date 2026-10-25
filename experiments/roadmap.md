@@ -95,6 +95,14 @@ falsification check. If attribution remains ambiguous, report that clearly.
 
 ## Milestone 4: Test adaptation only if Milestone 3 supports it
 
+**Status: deferred (October 24, 2026); entry gate not met.** Milestone 3 does yield
+reproducible, distinguishable operating states (the three token budgets), but its data
+cannot evaluate a selection policy without inventing rewards. Each budget ran as its
+own server under fixed closed-loop concurrency, with no switching between states;
+closed-loop timing differs across budgets, so there is no per-request counterfactual;
+and every repetition replays the same seed-2027 prompts. A fair comparison would need
+a new two-backend experiment, which the current budget doesn't cover.
+
 **Question:** Can measurements of changing resource conditions improve backend
 selection for a user-facing inference objective?
 
@@ -128,6 +136,12 @@ prior-work check.
 this time to strengthen Milestone 3 and the final report.
 
 ## Milestones 5–9: Full factor studies
+
+**Milestone 5 pilot: pre-registered October 24, 2026**
+([protocol](milestone5.md)). It varies prompt length (1024, 2048, 4096) against the
+token budget (2048, 8192) at C32, with an optional C8 block, and logs each engine
+step's scheduled tokens with an opt-in vLLM plugin. It tests the step-size explanation
+that Phase D could not.
 
 These are the original planned stages, kept as later milestones. Milestone 3 takes a
 deliberately narrow slice of them: two workload regimes and one contention
@@ -163,8 +177,9 @@ start. Its Milestone 3 data serve only as a pilot; the full study is still neede
 
 ## Priority, budget, and final artifact
 
-Milestone 2 is complete; make Milestone 3 the core contribution. Milestone 4 is
-optional. Milestones 5–9 are beyond the current budget.
+Milestone 3 is the core contribution. Milestone 4 is deferred (see above). The
+Milestone 5 pilot uses the time Milestone 4 would have taken; the full Milestones 5–9
+remain beyond the current budget.
 
 Planned effort is roughly 27–40 focused hours: 4–6 for Milestone 2, 15–22 for
 Milestone 3, and 8–12 for Milestone 4. Hours already spent on Milestone 1 count
