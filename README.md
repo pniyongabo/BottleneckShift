@@ -113,8 +113,9 @@ the most complete.
 |---|---|---|
 | 1–2 | Concurrency effect, then repeated under explicit cache, sampling, and model controls | Complete ([1](reports/milestone1-20261001T205137Z.md), [2](reports/milestone2-20261003T034456Z.md)) |
 | 3 | Workload regimes, concurrency crossover, GPU contention, token-budget intervention | Complete ([B](reports/milestone3-20261003T180358Z-phase-b.md), [C](reports/milestone3-20261003T201214Z-phase-c.md), [D](reports/milestone3-20261006T022744Z-phase-d.md)) |
-| 4 | Measurement-driven backend selection | Proposed |
-| 5–9 | Workload shape, network, host contention, GPU contention, crossed factors | Proposed |
+| 4 | Measurement-driven backend selection | Deferred: entry gate not met ([roadmap](experiments/roadmap.md)) |
+| 5 (pilot) | Prompt length versus token budget, with a per-step scheduler log | Pre-registered ([protocol](experiments/milestone5.md)) |
+| 5–9 | Full workload-shape study, network, host contention, GPU contention, crossed factors | Proposed |
 
 Proposed milestones have no data yet, and each needs its own pre-registered protocol
 first. Scope and status: [roadmap](experiments/roadmap.md).

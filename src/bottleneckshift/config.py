@@ -5,7 +5,7 @@ import tomllib
 
 from bottleneckshift import contention
 
-TELEMETRY_KEYS = ("server_metrics", "gpu_sampler", "cpu_sampler")
+TELEMETRY_KEYS = ("server_metrics", "gpu_sampler", "cpu_sampler", "step_log")
 CONTENTION_KEYS = ("mode", "duty_cycle", "period_ms", "memory_cap_mib", "matrix_size",
                    "ready_timeout_seconds")
 MAX_CONTENTION_MIB = 1024

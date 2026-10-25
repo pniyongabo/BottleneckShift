@@ -8,6 +8,10 @@ version = "0.1.0"
 description = "Reproducible experiments for diagnosing LLM inference bottlenecks"
 requires-python = ">=3.11"
 
+# Loaded by vLLM in every process; inert unless BOTTLENECKSHIFT_STEP_LOG is set.
+[project.entry-points."vllm.general_plugins"]
+bottleneckshift_steplog = "bottleneckshift.vllm_steplog:register"
+
 [project.optional-dependencies]
 analysis = ["matplotlib==3.11.2"]
 test = ["pytest==9.1.1", "matplotlib==3.11.2"]
