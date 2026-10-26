@@ -146,6 +146,11 @@ the scale of the ITL tail (B8192 about 3× B2048). The primary tail prediction f
 its L1024 part: the scheduler packed two 1024-token prompts into one 2048-token step.
 Seven of eight C32 predictions held; the optional C8 block was not run.
 
+**Milestone 5 Part 2: pre-registered October 26, 2026** (addendum in the
+[protocol](milestone5.md)). It runs the C8 block and a context-length test: one request
+at a time with 8192-token prompts at budgets 1024 and 2048, so each prefill chunk has a
+fixed size at a known context position. The step log adds executor-side timing.
+
 These are the original planned stages, kept as later milestones. Milestone 3 takes a
 deliberately narrow slice of them: two workload regimes and one contention
 intervention. Each milestone below widens one factor into its own pre-registered

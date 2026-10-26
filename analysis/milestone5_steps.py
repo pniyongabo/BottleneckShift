@@ -45,6 +45,22 @@ def run_steps(steps: list[dict], start: float, end: float) -> list[tuple[int, fl
     return pairs
 
 
+def execution_times(steps: list[dict]) -> dict[int, float]:
+    """Execution time of each step with a recorded output time (Part 2 logs), in seconds.
+
+    A step can start once it has been scheduled and the previous step's results have
+    arrived, so its execution time is t_output[n] - max(t_end[n], t_output[n-1]).
+    This holds whether or not the engine schedules the next step early.
+    """
+    timed = sorted((s for s in steps if "t_output" in s and "step" in s), key=lambda s: s["step"])
+    result, previous = {}, None
+    for record in timed:
+        start = record["t_end"] if previous is None else max(record["t_end"], previous)
+        result[record["step"]] = record["t_output"] - start
+        previous = record["t_output"]
+    return result
+
+
 def ranks(values: list[float]) -> list[float]:
     order = sorted(range(len(values)), key=values.__getitem__)
     result = [0.0] * len(values)
