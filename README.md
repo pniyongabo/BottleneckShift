@@ -47,9 +47,14 @@ All on one GPU with a 0.5B model (Qwen2.5-0.5B-Instruct on an RTX A4000).
    from 0.44 to 0.24, against the pre-registered prediction. Changing vLLM's per-step
    token budget reshapes this cost: at 32 requests, 8192 tokens gives a 7 ms median ITL
    and 18% more throughput but a 169 ms p99, while 512 evens out ITL but triples TTFT.
-   The pre-registered test did not support a step-size explanation of this effect.
+   A follow-up pilot that logged every engine step confirmed that a step's cost tracks
+   the tokens it schedules (about 6 ms for a decode-only step, 55 ms for a full
+   2048-token step) and that the budget sets the scale of the tail. Its primary tail
+   prediction failed in one part: short prompts were packed two per step instead of
+   making steps smaller.
    ([Phase C](reports/milestone3-20261003T201214Z-phase-c.md),
-   [Phase D](reports/milestone3-20261006T022744Z-phase-d.md))
+   [Phase D](reports/milestone3-20261006T022744Z-phase-d.md),
+   [Milestone 5 pilot](reports/milestone5-20261025T004640Z-pilot.md))
 3. **Under closed-loop load, GPU contention looks different from added load.** A
    co-located process at a 50% duty cycle costs 13–15% end-to-end latency. It slows
    single requests too and, with one request at a time, slows prefill more than decode,
@@ -114,7 +119,7 @@ the most complete.
 | 1–2 | Concurrency effect, then repeated under explicit cache, sampling, and model controls | Complete ([1](reports/milestone1-20261001T205137Z.md), [2](reports/milestone2-20261003T034456Z.md)) |
 | 3 | Workload regimes, concurrency crossover, GPU contention, token-budget intervention | Complete ([B](reports/milestone3-20261003T180358Z-phase-b.md), [C](reports/milestone3-20261003T201214Z-phase-c.md), [D](reports/milestone3-20261006T022744Z-phase-d.md)) |
 | 4 | Measurement-driven backend selection | Deferred: entry gate not met ([roadmap](experiments/roadmap.md)) |
-| 5 (pilot) | Prompt length versus token budget, with a per-step scheduler log | Pre-registered ([protocol](experiments/milestone5.md)) |
+| 5 (pilot) | Prompt length versus token budget, with a per-step scheduler log | Complete, C32 block ([report](reports/milestone5-20261025T004640Z-pilot.md)) |
 | 5–9 | Full workload-shape study, network, host contention, GPU contention, crossed factors | Proposed |
 
 Proposed milestones have no data yet, and each needs its own pre-registered protocol

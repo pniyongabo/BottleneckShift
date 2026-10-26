@@ -40,6 +40,10 @@ scrapes taken before and after the run.
 | **Iteration tokens** (*server*) | The `vllm:iteration_tokens_total` histogram, observed once per output-producing iteration. In vLLM 0.29.0 each value is the computed prompt tokens (the full prompt length, since prefix caching is off) of requests that emitted their first token in that iteration, plus tokens generated. It is not tokens computed per step: a request's whole prompt is credited at its first token. So with 2048-token prompts, "share over 512/1024/2048" is the share of iterations in which a prefill completed, and "share over 8192" the share in which at least four did (Phase D report). |
 | **Server iteration time** (*custom*, column `server_step_ms`) | Benchmark duration divided by output iterations in the run: the mean time per iteration, including idle gaps. |
 
+| **Step log** (*server*, Milestone 5) | `steps.jsonl`, written by the opt-in vLLM plugin `src/bottleneckshift/vllm_steplog.py`: one line per engine step that schedules tokens, with its total scheduled tokens, how many were prompt (prefill) tokens, the number of scheduled requests, and the wall-clock time around scheduling. Unlike the iteration-token histogram, it records per-step chunk sizes. |
+| **Step interval** (*custom*, Milestone 5) | Time from one logged step's start to the next step's start within a run; the run's last step and gaps over 1 s are dropped. It includes output processing, and may partly reflect the previous step (Milestone 5 report). |
+| **Large / small step** (*custom*, Milestone 5) | A step scheduling at least 1024 / at most 64 tokens. |
+
 ## Load and experimental design
 
 | Term | Meaning |

@@ -137,11 +137,14 @@ this time to strengthen Milestone 3 and the final report.
 
 ## Milestones 5–9: Full factor studies
 
-**Milestone 5 pilot: pre-registered October 24, 2026**
-([protocol](milestone5.md)). It varies prompt length (1024, 2048, 4096) against the
-token budget (2048, 8192) at C32, with an optional C8 block, and logs each engine
-step's scheduled tokens with an opt-in vLLM plugin. It tests the step-size explanation
-that Phase D could not.
+**Milestone 5 pilot: complete (C32 block), October 25, 2026**
+([protocol](milestone5.md), [report](../reports/milestone5-20261025T004640Z-pilot.md)).
+It varied prompt length (1024, 2048, 4096) against the token budget (2048, 8192) at
+C32 and logged each engine step's scheduled tokens with an opt-in vLLM plugin. Step
+cost tracks step size (large steps 9.8× small ones; Spearman 0.87), and the budget sets
+the scale of the ITL tail (B8192 about 3× B2048). The primary tail prediction failed in
+its L1024 part: the scheduler packed two 1024-token prompts into one 2048-token step.
+Seven of eight C32 predictions held; the optional C8 block was not run.
 
 These are the original planned stages, kept as later milestones. Milestone 3 takes a
 deliberately narrow slice of them: two workload regimes and one contention

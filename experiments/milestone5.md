@@ -209,4 +209,16 @@ None.
 
 ## Outcome
 
-To be added after the report.
+**C32 block completed October 25, 2026:** session `milestone5-20261025T004640Z`, seven
+series, 2,100 measured requests validated. See the
+[report](../reports/milestone5-20261025T004640Z-pilot.md).
+
+- Predictions 1, 2, 4, 5, 6, and 7 were confirmed. Step cost tracks step size: the
+  pooled large-step median interval was 9.8× the small-step one, with a Spearman
+  correlation of 0.87.
+- Prediction 3 was not confirmed. L4096 was within +11% of L2048 at B2048, as
+  predicted, but L1024's ITL p99 was only 18.7% lower (threshold 25%), because the
+  scheduler packed two 1024-token prompts into one 2048-token step. Under the
+  falsification rule, step size explains per-step cost, but H's account of the tail for
+  prompts shorter than the budget is not supported.
+- The C8 block was not run, so predictions 8–10 are not scored.
