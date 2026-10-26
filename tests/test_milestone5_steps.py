@@ -35,3 +35,12 @@ def test_pooled_ratio_uses_large_and_small_step_medians():
     result = steps_module.pooled(pairs)
     assert (result["large_steps"], result["small_steps"]) == (2, 2)
     assert result["ratio"] == pytest.approx(0.055 / 0.0055)
+
+
+def test_execution_time_starts_when_the_step_is_scheduled_and_the_previous_step_is_done():
+    steps = [{"step": 1, "t_end": 0.000, "t_output": 0.030},
+             {"step": 2, "t_end": 0.001, "t_output": 0.050},   # scheduled early: waits for step 1
+             {"step": 3, "t_end": 0.080, "t_output": 0.090},   # scheduled after step 2 finished
+             {"step": 4, "t_end": 0.100}]                      # no output time recorded
+    times = steps_module.execution_times(steps)
+    assert {k: round(v, 3) for k, v in times.items()} == {1: 0.030, 2: 0.020, 3: 0.010}

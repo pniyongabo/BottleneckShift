@@ -38,7 +38,7 @@ def test_wrapped_schedule_splits_prefill_and_decode_and_skips_empty_steps(tmp_pa
     path = tmp_path / "steps.jsonl"
     scheduler = StubScheduler([{"a": 2048}, {"a": 1024, "b": 1024}, {}, {"a": 1, "b": 1024}, {"a": 1, "b": 1}])
     scheduler.requests = {"a": request(3072), "b": request(2048)}
-    schedule = vllm_steplog.wrap_schedule(StubScheduler.schedule, str(path))
+    schedule = vllm_steplog.wrap_schedule(StubScheduler.schedule, vllm_steplog.StepLog(str(path)))
     for _ in range(5):
         schedule(scheduler)
     steps = vllm_steplog.read_steps(path.read_text())
@@ -46,6 +46,27 @@ def test_wrapped_schedule_splits_prefill_and_decode_and_skips_empty_steps(tmp_pa
             for s in steps] == [(2048, 2048, 0, 1, 1), (2048, 2048, 0, 2, 2), (1025, 1024, 1, 2, 1),
                                 (2, 0, 2, 2, 0)]
     assert all(s["t_start"] <= s["t_end"] for s in steps)
+    assert [s["step"] for s in steps] == [1, 2, 3, 4]
+    # Prefill chunks carry their context position; kv_tokens sums computed tokens before the step.
+    assert [s["chunks"] for s in steps] == [[[0, 2048]], [[2048, 1024], [0, 1024]], [[1024, 1024]], []]
+    assert [s["kv_tokens"] for s in steps] == [0, 2048, 4096, 5121]
+
+
+def test_output_times_are_matched_to_their_step_even_when_the_next_step_is_scheduled_first(tmp_path):
+    path = tmp_path / "steps.jsonl"
+    log = vllm_steplog.StepLog(str(path))
+    scheduler = StubScheduler([{"a": 1024}, {"a": 1024}])
+    scheduler.requests = {"a": request(2048)}
+    schedule = vllm_steplog.wrap_schedule(StubScheduler.schedule, log)
+    update = vllm_steplog.wrap_update(lambda self, output, runner_output: "updated", log)
+    first, second = schedule(scheduler), schedule(scheduler)  # batch queue: two steps in flight
+    assert update(scheduler, second, None) == "updated"
+    update(scheduler, first, None)
+    update(scheduler, first, None)  # a repeat for the same output writes nothing
+    steps = vllm_steplog.read_steps(path.read_text())
+    assert [s["step"] for s in steps] == [1, 2]
+    assert steps[0]["t_output"] >= steps[1]["t_output"] >= steps[1]["t_end"]
+    assert len(path.read_text().splitlines()) == 4
 
 
 def test_register_is_inert_without_the_environment_variable(monkeypatch):
@@ -80,6 +101,19 @@ def test_milestone5_configs_match_the_protocol():
                 assert config["telemetry"] == {**base["telemetry"], "step_log": True}
                 assert config["sampling"] == base["sampling"]
                 assert config["condition"] == [{"name": f"c{level}", "max_concurrency": level}]
+
+
+def test_part2_context_configs_match_the_addendum():
+    base = load_config(Path("configs/milestone5-len2048-budget2048-c32.toml"))
+    for budget in (1024, 2048):
+        config = load_config(Path(f"configs/milestone5-ctx-len8192-budget{budget:04d}-c1.toml"))
+        assert config["experiment"]["name"] == f"milestone5-ctx-len8192-budget{budget:04d}-c1"
+        assert config["execution"] == {**base["execution"], "warmup_concurrencies": [1]}
+        assert config["server"] == {**base["server"], "max_num_batched_tokens": budget}
+        assert config["workload"] == {**base["workload"], "input_tokens": 8192}
+        for key in ("telemetry", "sampling"):
+            assert config[key] == base[key]
+        assert config["condition"] == [{"name": "c1", "max_concurrency": 1}]
 
 
 def test_step_log_environment_is_opt_in(tmp_path):

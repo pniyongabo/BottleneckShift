@@ -203,9 +203,109 @@ share of prefill-carrying steps differs by L and B.
 * Repetitions replay the same seed-2027 prompts, so they measure run-to-run variation,
   not prompt-to-prompt variation.
 
+## Part 2 addendum (pre-registered 2026-10-26, before any Part 2 data)
+
+### Why
+
+Part 2 follows from the pilot's C32 results
+([report](../reports/milestone5-20261025T004640Z-pilot.md)), which raised three
+questions:
+1. **Packing.** The scheduler fills a step with several short prompts, so prompt length
+   below the budget changed how often steps carried prefill, not how large they were.
+   The C8 block (predictions 8–10) tests the same tail and median predictions where
+   fewer prompts wait.
+2. **Context length (post hoc in the pilot).** Steps of the same size cost more for
+   longer prompts (45, 55.5, and 57.7 ms for 2048-token steps at L1024, L2048, and
+   L4096). Part 2B tests that directly, with fixed chunk sizes at known context
+   positions.
+3. **Timing.** Step intervals correlated slightly better with the previous step than
+   with the current one, which fits vLLM 0.29.0 scheduling the next step before the
+   current step's results are processed. Part 2 adds executor-side timing.
+
+### Part 2A: the C8 block
+
+Run as pre-registered above (series 8–13, in that order). Predictions 1, 2, and 8–10
+and their thresholds are unchanged, and predictions 1 and 2 keep their definitions
+(step interval as schedule-to-schedule time).
+
+### Part 2B: context-length test
+
+* **Configs:** `configs/milestone5-ctx-len8192-budget{1024,2048}-c1.toml`, copied from
+  `configs/milestone5-len2048-budget2048-c32.toml`. Only the name, warm-up level,
+  budget, input length (8192), and condition (C1) differ.
+* **Design:** one request at a time (C1), so every prefill step carries one chunk of
+  one prompt. Each 8192-token prompt is prefilled in 8192 / B chunks of exactly B
+  tokens, at context positions 0, B, 2B, …, 8192 − B. With 32-token outputs, 100
+  prompts per run, and three repetitions, each series gives 300 prompts × 8192 / B
+  chunks.
+* **Series:** `ctx-budget1024`, then `ctx-budget2048`.
+
+### Instrument additions
+
+The plugin (`src/bottleneckshift/vllm_steplog.py`) now also records, for each step:
+- a sequence number (`step`);
+- each prefill chunk's context position (computed tokens before the step) and size
+  (`chunks`);
+- the scheduled requests' computed tokens before the step (`kv_tokens`).
+
+It also wraps `Scheduler.update_from_output()`, logging the time a step's results
+arrive (`t_output`), matched to the step by its scheduler output. The pilot's fields
+and their meanings are unchanged.
+
+**Execution time:** t_output[n] − max(t_end[n], t_output[n − 1]). A step can start once
+it has been scheduled and the previous step's results have arrived, so this holds
+whether or not the engine schedules the next step early. When it does, the GPU may
+start a step slightly before the previous step's results reach the scheduler, so in
+that case this slightly underestimates execution time.
+
+**Full chunk:** a step with exactly one prefill chunk of exactly B tokens.
+
+### Predictions
+
+11. **Instrument check (Part 2B).** In both context series:
+    - every step that carries prefill holds exactly one full chunk;
+    - each prompt's chunks sit at context positions 0, B, …, 8192 − B;
+    - each run's logged prefill total equals 100 × 8192;
+    - every logged step has an output time.
+12. **Primary for Part 2: context raises the cost of a fixed-size chunk.** In each
+    context series, the median execution time of full chunks at the deepest position
+    (context 8192 − B) is at least 1.2× that at context 0, and the Spearman correlation
+    between a full chunk's context position and its execution time is at least 0.6.
+13. **Cost grows with chunk size.** At context 0, the median execution time of a
+    2048-token chunk (B2048 series) is between 1.4× and 2.5× that of a 1024-token
+    chunk (B1024 series). The range allows for a fixed per-step overhead (below 2×)
+    and for attention within the chunk, which grows faster than linearly (above 2×).
+14. **Executor timing removes the lag.** Pooled over the C8 block, the Spearman
+    correlation between a step's tokens and its execution time is at least as high as
+    the correlation between its tokens and its schedule interval. Scored only if all
+    six C8 series complete and validate.
+
+### Falsification
+
+- **If prediction 11 fails** in a context series, predictions 12 and 13 are not scored
+  for it, and the report says why.
+- **If prediction 11 holds but prediction 12 fails,** the pilot's post hoc reading
+  (same-size steps cost more at longer contexts) is not supported on this setup.
+- **Prediction 13** tests whether cost grows roughly in proportion to chunk size; a
+  failure qualifies the step-size account without rejecting it.
+- The C8 block is scored by the original rules above.
+
+### Session rules
+
+* One GPU session, in this order: `ctx-budget1024`, `ctx-budget2048`, then the C8 block
+  (series 8–13). Pre-registration merges before any Part 2 run.
+* Validate each series as it finishes. A failed series reruns under a new series ID;
+  nothing is spliced. If the session stops partway, completed series are kept and
+  reported, and predictions that depend on missing series are not scored.
+* Archive and checksum before teardown, and verify the checksum on the laptop.
+* Estimated time: about 3–4 minutes per context series and about 4 minutes per C8
+  series, so about 35 minutes of collection plus about 30 minutes of host setup.
+
 ## Amendments
 
-None.
+- **2026-10-26 (before any Part 2 data):** the Part 2 addendum above. The step log
+  gains the fields listed there; the pilot's fields and definitions are unchanged. The
+  C8 block will run with the extended log.
 
 ## Outcome
 
