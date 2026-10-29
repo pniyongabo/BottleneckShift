@@ -50,8 +50,7 @@ added an opt-in vLLM plugin that logs each engine step's scheduled tokens, split
 prefill and decode, and its requests. Part~2 added each prefill chunk's context
 position and the time the step's results returned. From these we compute a step's
 \emph{execution time}: from when it could start (it was scheduled and the previous
-step's results had arrived) until its own results arrived. We did not record which of
-vLLM's scheduling modes was active.
+step's results had arrived) until its own results arrived.
 % src: reports/milestone3-*-phase-d.md (iteration histogram); experiments/milestone5.md (Instrument; Part 2 addendum)
 
 \paragraph{Validation.}

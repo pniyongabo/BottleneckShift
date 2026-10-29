@@ -2,7 +2,7 @@
 \label{sec:intro}
 
 LLM serving systems batch many requests through one model. Each engine step generates
-one token for every running request and may also process part of a new prompt.
+one token for every decoding request and may also process part of a new prompt.
 Service targets are written in time to first token (TTFT) and time per output token
 (TPOT), so an operator who sees latency rise needs to know which phase grew. Past saturation the
 excess work is the same either way; the scheduler decides whether it shows up as

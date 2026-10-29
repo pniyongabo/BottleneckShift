@@ -12,10 +12,11 @@ of each request's latency (1.2 of 1.8\,s). At 2048, most steps carry a full 2048
 chunk (in Milestone 5's step log, 77\% of steps carried prompt work), so p50 and p99
 are both near 55--59\ms. At 8192, several prompts share fewer, larger steps: the
 median falls to 6.9\ms{} and throughput rises 18\%, but p99 rises to 169\ms. The
-budget with the best median has the worst tail. Against the documentation's guidance,
-8192 also raised mean TTFT relative to 2048; without each run's start-up burst, mean TTFT
-was 1{,}542, 217, and 609\ms{} for 512, 2048, and 8192 (post hoc). By mean TPOT, the order is 512
-(15\ms), 8192 (26\ms), and 2048 (45\ms).
+budget with the best median has the worst tail, so the documentation's ITL guidance
+holds for p99 only. Against its TTFT guidance, 8192 also raised mean TTFT relative to
+2048; without each run's start-up burst, mean TTFT was 1{,}542, 217, and 609\ms{} for
+512, 2048, and 8192 (post hoc). By mean TPOT, the order is 512 (15\ms), 8192
+(26\ms), and 2048 (45\ms).
 % src: reports/reanalysis-20261028.md (section 6, steady-state TTFT); reports/milestone3-20261006T022744Z-phase-d.md (Result table: queue 1222.3 of E2E 1843.9 ms at 512; mean E2E and TTFT per budget; prediction 7; prediction 10); reports/milestone5-*-pilot.md (step-log table, anchor-before)
 
 \begin{table}[t]

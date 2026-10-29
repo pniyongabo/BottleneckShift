@@ -3,34 +3,36 @@
 
 \paragraph{Phases and steps.}
 vLLM runs in \emph{engine steps}: each step, the scheduler picks the tokens to process
-and the model runs one forward pass over all of them. A request first waits in a
-\emph{queue}. Its \emph{prefill} phase processes the prompt and produces the first
-output token. Its \emph{decode} phase then produces each remaining output token in one
-step, so a request with 32 output tokens spends 31 steps in decode. With chunked
-prefill \citep{agrawal2024sarathiserve}, a long prompt is split across several steps,
-and one step can carry both decode tokens and prompt chunks.
+and the model runs one forward pass over them. A request waits in a \emph{queue}; its
+\emph{prefill} then processes the prompt and produces the first output token, and its
+\emph{decode} produces each remaining token, one per step. With chunked prefill
+\citep{agrawal2024sarathiserve}, a long prompt is split across steps, so one step can
+carry both decode tokens and prompt chunks. vLLM 0.29.0 enables asynchronous
+scheduling by default in our configuration: it schedules step $n{+}1$ before it
+processes step $n$'s results.
+% src: vLLM v0.29.0 source: config/vllm.py (async_scheduling defaults to True for a generative model without speculative decoding on the uniproc executor), max_concurrent_batches = 2, v1/engine/core.py step_with_batch_queue
 
 \paragraph{Token budget.}
-The \emph{token budget} $B$ (vLLM's \texttt{max\_num\_batched\_tokens}) is the most
-tokens one step may process: one per decoding request plus every prompt token in the
-step's chunks. Its default in our configuration is 2048. The scheduler fills each step
-first with running requests (one token per decoding request, or the next chunk of a
-prompt in progress) and then with waiting prompts, until the budget is used. A step
-that carries a large chunk takes about as long as a prefill, and every request decoding
-in that step waits for it. vLLM's documentation says smaller budgets give better
-inter-token latency and larger ones better TTFT and throughput
+The \emph{token budget} $B$ (\texttt{max\_num\_batched\_tokens}) is the most tokens one
+step may process, counting one per decoding request and every prompt token in the
+step's chunks. vLLM's default for its API server on GPUs under 70\,GB, as here, is
+2048. The scheduler fills each step with running requests first and then with waiting
+prompts, until the budget is used. A step that carries a large chunk takes about as
+long as a prefill, and every request decoding in it waits. vLLM's documentation says
+smaller budgets give better ITL and larger ones better TTFT and throughput
 \citep{vllmdocsoptimization}.
+% src: vLLM v0.29.0 source: engine/arg_utils.py (OPENAI_API_SERVER default 2048 below 70 GiB), v1/core/sched/scheduler.py (RUNNING then WAITING)
 
 \paragraph{Metrics.}
-Client metrics come from vLLM's benchmark. TTFT runs from sending a request to
-receiving its first token, and E2E to receiving its last. Inter-token latency (ITL) is
-each gap between consecutive tokens of a request; time per output token (TPOT) is a
-request's average gap, $(\mathrm{E2E}-\mathrm{TTFT})/(n-1)$ for $n$ output tokens. We
-report ITL percentiles, the median (p50) and 99th percentile (p99), because averages
-hide jitter \citep{agrawal2024etalon}. The benchmark pools the gaps of all requests in a
-run, and one step produces a gap for every request decoding in it, so a run's ITL p99
-reflects its slowest few steps; where we give a mean ITL, it nearly equals the mean
-TPOT. The \emph{share of latency before the first token} is $\sum \mathrm{TTFT} / \sum
-\mathrm{E2E}$ over a run's requests. On the server, vLLM's histograms split each
-request into queue, prefill (from first being scheduled to the first token), and
-decode (from the first token to the last) time.
+We use the definitions of vLLM's benchmark. TTFT runs from sending a request to its
+first streamed output, and E2E to its last. Inter-token latency (ITL) is each gap
+between consecutive streamed outputs of a request, usually one token each; time per
+output token (TPOT) is a request's average gap, $(\mathrm{E2E}-\mathrm{TTFT})/(n-1)$
+for $n$ output tokens. We report ITL p50 and p99, because averages hide jitter
+\citep{agrawal2024etalon}. The benchmark pools the gaps of all requests in a run, and
+one step produces a gap for every request decoding in it, so p99 reflects a run's
+slowest few steps; a mean ITL nearly equals the mean TPOT. The \emph{share of latency
+before the first token} is $\sum \mathrm{TTFT} / \sum \mathrm{E2E}$ over a run.
+vLLM's server histograms split each request into queue, prefill (first scheduled to
+first token), and decode (first token to last) time.
+% src: vLLM v0.29.0 docs/benchmarking/cli.md and benchmarks/serve.py (ITL between streamed outputs, pooled; TPOT per request); v1/metrics/stats.py (queue, prefill, decode intervals)
