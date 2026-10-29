@@ -1,17 +1,23 @@
 \section{Method}
 \label{sec:method}
 
-\paragraph{Setup.}
-All experiments used a rented NVIDIA RTX A4000 (16\,GB) with the NVIDIA 580-series
-driver and vLLM 0.29.0, serving Qwen2.5-0.5B-Instruct. Sessions ran on several rented
-virtual machines, each with its own physical GPU; Phase C reused Phase B's machine. The
-client was \texttt{vllm bench serve} on the same host, issuing a closed-loop workload:
-up to a fixed number of requests (the concurrency, C1 to C32) are kept in flight, and a
+\paragraph{Hardware and software.}
+Each session rented a virtual machine with one NVIDIA RTX A4000 (Ampere, 16\,GB,
+140\,W board power), 4 vCPUs, and 20\,GiB of RAM (recorded for Milestones 1--3),
+running Ubuntu 24.04 (Linux 6.14). Sessions ran on several such machines, each with
+its own physical GPU; Phase C reused Phase B's. The software was vLLM 0.29.0 with PyTorch 2.13.0, CUDA 13.0, and Python
+3.12.3, and NVIDIA driver 580.178.04 for Milestones 1--3 and 580.196.07 for Milestone
+5; \texttt{nvidia-smi} is the version bundled with each driver. The model was
+Qwen2.5-0.5B-Instruct in bf16.
+
+\paragraph{Workload.}
+The client was \texttt{vllm bench serve} on the same host, issuing a closed-loop
+workload: up to a fixed number of requests (the concurrency, C1 to C32) are kept in flight, and a
 new one is sent as soon as one finishes. Each run sends 100 requests (50 for the
 decode-heavy workload), so a run at C32 starts with a burst of 32 requests and ends as
 the last ones drain. Prompts are synthetic, with exact input and output lengths and a
 fixed seed.
-% src: configs/*.toml (num_prompts 100; 50 for decode-heavy); reports/milestone1-*.md (driver 580.178.04); reports/milestone2-*.md (different physical GPU); reports/milestone3-*-phase-c.md (same VM as Phase B); reports/milestone5p2-*-part2.md (Provenance)
+% src: configs/*.toml (num_prompts 100; 50 for decode-heavy); reports/milestone1-*.md, milestone2-*.md, milestone3-*-phase-b.md, milestone3-*-phase-c.md (host: 4 vCPU, 20 GiB, Ubuntu 24.04, kernel 6.14; Python 3.12.3, vLLM 0.29.0, PyTorch 2.13.0, CUDA 13.0); reports/milestone5-*-pilot.md, milestone5p2-*-part2.md (driver 580.196.07, Linux 6.14); A4000 datasheet (140 W); reports/milestone1-*.md (driver 580.178.04); reports/milestone2-*.md (different physical GPU); reports/milestone3-*-phase-c.md (same VM as Phase B); reports/milestone5p2-*-part2.md (Provenance)
 
 \paragraph{Controls.}
 Milestone 1 compared C1 with C8 in forward and reverse order, with three repetitions
@@ -44,8 +50,7 @@ added an opt-in vLLM plugin that logs each engine step's scheduled tokens, split
 prefill and decode, and its requests. Part~2 added each prefill chunk's context
 position and the time the step's results returned. From these we compute a step's
 \emph{execution time}: from when it could start (it was scheduled and the previous
-step's results had arrived) until its own results arrived. We did not record which of
-vLLM's scheduling modes was active.
+step's results had arrived) until its own results arrived.
 % src: reports/milestone3-*-phase-d.md (iteration histogram); experiments/milestone5.md (Instrument; Part 2 addendum)
 
 \paragraph{Validation.}

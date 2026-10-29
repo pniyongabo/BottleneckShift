@@ -14,8 +14,8 @@ hypothesis's first clause at C8.
 % src: reports/milestone5-20261025T004640Z-pilot.md (predictions 1, 2); reports/milestone5p2-*-part2.md (prediction 2; Result: the pre-registered rule rejects H's first clause at C8); experiments/milestone5.md (falsification rule)
 
 \paragraph{A lagged measure.}
-vLLM 0.29.0 can schedule step $n{+}1$ before it processes step $n$'s results, so the
-interval credited to step $n$ partly reflects the cost of step $n{-}1$. In the C8
+Under asynchronous scheduling (Section~\ref{sec:background}), the interval credited
+to step $n$ partly reflects the cost of step $n{-}1$. In the C8
 block the engine scheduled 97--100\% of steps this way, and at $B{=}2048$ a step's
 interval correlated 0.96--0.99 with the previous step's execution time, against
 0.69--0.82 with its own (post hoc; Figure~\ref{fig:timing}). Some intervals are too

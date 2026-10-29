@@ -3,7 +3,7 @@
 
 \begin{itemize}
   \item \emph{One setup.} All results come from one 0.5B model on one GPU type with
-    one vLLM version. A generation step at C1 took about 3.9\ms{} against a 2.2\ms{}
+    one vLLM version. A decode step at C1 took about 3.9\ms{} against a 2.2\ms{}
     floor for reading the weights, so host-side and launch work is a large share of
     each step. Larger models, other GPUs, and other serving systems could change the
     results qualitatively as well as in scale.

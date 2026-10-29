@@ -20,59 +20,63 @@ references; source in [`paper/`](paper/)).
 
 Serving systems are tuned for different goals. DistServe, for example, sets separate
 time-to-first-token (TTFT) and time-per-output-token (TPOT) targets for chatbot,
-code-completion, and summarization services [[3]](#related-work). Knowing which phase of
+code-completion, and summarization services [[2]](#related-work). Knowing which phase of
 a request dominates, and when that changes, decides what to tune:
 
 - **Interactive chat and coding assistants.** Users feel both the wait for the first
-  token and how smoothly tokens stream. Under load, the delay moves into per-step
-  generation, and the scheduler's token budget shifts that cost between median and tail
-  latency (finding 2).
+  token and how smoothly tokens stream. Under load, the delay moves into per-step time,
+  and the scheduler's token budget shifts that cost between median and tail latency
+  (findings 2 and 3).
 - **Long-prompt workloads such as retrieval-augmented generation.** A workload that
   looks prefill-heavy can still be dominated by decode (finding 1).
-- **Shared GPUs.** Multi-tenant clusters co-locate work with MPS or time slicing
-  [[8]](#related-work). A co-located job slows inference in ways that GPU utilization
-  barely shows (finding 3).
 - **Capacity planning and autoscaling.** Throughput at high concurrency depends on the
-  scheduler's token budget: at 32 requests, raising it from the default 2048 to 8192
-  gave 18% more throughput (finding 2).
+  token budget: at 32 requests, raising it from the default 2048 to 8192 gave 18% more
+  throughput (finding 3).
+- **Shared GPUs.** A co-located job slows inference in ways that GPU utilization barely
+  shows (finding 5).
 
 ## Findings so far
 
-All on one GPU with a 0.5B model (Qwen2.5-0.5B-Instruct on an RTX A4000).
+All on one RTX A4000 with vLLM 0.29.0 serving Qwen2.5-0.5B-Instruct. Inter-token
+latency (ITL) is the gap between consecutive streamed outputs of a request; the token
+budget is vLLM's `max_num_batched_tokens`, the most tokens one engine step may process.
 
-1. **Decode dominates each request's end-to-end latency, even with long prompts.** With
-   2048-token prompts and 32-token outputs, a request running alone spends about 40 ms
-   in prefill and about 122 ms in its 31 generation steps. At 8 concurrent requests,
-   much of a request's decode time is spent in steps that also carry other requests'
-   prefill chunks. ([Phase B](reports/milestone3-20261003T180358Z-phase-b.md))
+1. **Decode dominates each request, even with long prompts.** With 2048-token prompts
+   and 32-token outputs, a request running alone spends about 40 ms in prefill and
+   about 122 ms in its 31 decode steps, as a FLOP and memory-bandwidth estimate
+   predicts. At 8 concurrent requests, much of a request's decode time is spent in
+   steps that also carry other requests' prompt chunks.
+   ([Phase B](reports/milestone3-20261003T180358Z-phase-b.md))
 2. **From 8 to 32 concurrent requests, past saturation, added latency moves into
-   per-step time.** Median inter-token latency (ITL) rises from 4.9 to 55 ms, while the
-   share of latency before the first token falls from 0.44 to 0.24, against the
-   pre-registered prediction. The shift is bounded: once every step is full, further
-   load must go into the wait for the first token. Changing vLLM's per-step token
-   budget reshapes this cost: at 32 requests, 8192 tokens gives a 7 ms median ITL and
-   18% more throughput but a 169 ms p99, while 512 evens out ITL but triples TTFT, and
-   queueing takes two thirds of each request's latency. A follow-up pilot that logged
-   every engine step showed that the budget sets the scale of the tail at 32 requests.
-   Its primary tail prediction failed in one part: short prompts were packed two per
-   step instead of making steps smaller. Its test of whether a step's cost tracks the
-   tokens it schedules passed at 32 requests, but the step timing it used turned out to
-   be confounded with the previous step, and the same test was rejected at 8 requests.
-   A post hoc [reanalysis](reports/reanalysis-20261028.md) with per-step execution time
-   supports the relation, and a simple step-cost model fit on one-request data predicts
-   ITL p99 at 8 requests within 5%.
-   A second part timed each prompt chunk directly, one request at a time, and showed
-   that a chunk's cost grows with its context, in line with a count of attention FLOPs:
-   a 1024-token chunk took 19.5 ms at context 1024 and 36 ms at context 7168.
+   per-step time.** Median ITL rises from 4.9 to 55 ms, while the share of latency
+   before the first token falls from 0.44 to 0.24, against the pre-registered
+   prediction. The shift is bounded: once every step is full, further load must go
+   into the wait for the first token.
    ([Phase C](reports/milestone3-20261003T201214Z-phase-c.md),
-   [Phase D](reports/milestone3-20261006T022744Z-phase-d.md),
+   [Phase D](reports/milestone3-20261006T022744Z-phase-d.md))
+3. **The token budget trades median against tail.** At 32 requests, 8192 tokens gives
+   a 7 ms median ITL and 18% more throughput but a 169 ms p99; 512 evens out ITL but
+   triples TTFT, and queueing takes two thirds of each request's latency. The budget
+   sets the scale of the tail. Short prompts were packed two per step instead of
+   making steps smaller, which failed part of the pre-registered tail prediction.
+   ([Phase D](reports/milestone3-20261006T022744Z-phase-d.md),
    [Milestone 5 pilot](reports/milestone5-20261025T004640Z-pilot.md),
    [Part 2](reports/milestone5p2-20261029T000043Z-part2.md))
-3. **Under closed-loop load, GPU contention looks different from added load.** A
+4. **A step's cost grows with its tokens and their context.** Timed one request at a
+   time, a 1024-token prompt chunk took 19.5 ms at context 1024 and 36 ms at context
+   7168, in line with a count of attention FLOPs. The pre-registered test that a
+   step's cost tracks its scheduled tokens was rejected at 8 requests, and its pass at
+   32 used a step interval that, under vLLM's asynchronous scheduling, lags by one
+   step. A post hoc [reanalysis](reports/reanalysis-20261028.md) with
+   per-step execution time supports the relation, and a four-term step-cost model fit
+   on one-request data predicts ITL p99 at 8 requests within 5%.
+   ([Part 2](reports/milestone5p2-20261029T000043Z-part2.md))
+5. **Under closed-loop load, GPU contention looks different from added load.** A
    co-located process at a 50% duty cycle costs 13–15% end-to-end latency. It slows
-   single requests too and, with one request at a time, slows prefill more than decode,
-   while `nvidia-smi` utilization, already near 90%, moves only 1–6 points. At 8 requests, queue time rose
-   only 6%, against the pre-registered prediction that it would rise more than prefill.
+   single requests too and, with one request at a time, slows prefill more than
+   decode, while `nvidia-smi` utilization, already near 90%, moves only 1–6 points. At
+   8 requests, queue time rose only 6%, against the pre-registered prediction that it
+   would rise more than prefill.
    ([Phase C](reports/milestone3-20261003T201214Z-phase-c.md))
 
 ![Phase C crossover: throughput, inter-token latency, and pre-first-token share against concurrency](reports/figures/milestone3-phase-c-crossover.png)
@@ -101,26 +105,25 @@ More figures, including the contention series: [`reports/figures/`](reports/figu
 
 ## Related work
 
-1. Yu et al., [Orca](https://www.usenix.org/conference/osdi22/presentation/yu), OSDI
-   2022: iteration-level scheduling, the batching model vLLM builds on.
-2. Kwon et al., [vLLM / PagedAttention](https://arxiv.org/abs/2309.06180), SOSP 2023:
+1. Kwon et al., [vLLM / PagedAttention](https://arxiv.org/abs/2309.06180), SOSP 2023:
    the serving system under study.
-3. Zhong et al., [DistServe](https://arxiv.org/abs/2401.09670), OSDI 2024: prefill and
+2. Zhong et al., [DistServe](https://arxiv.org/abs/2401.09670), OSDI 2024: prefill and
    decode interfere, and services set different TTFT and TPOT targets. This study
-   measures that interference on one GPU.
-4. Agrawal et al., [Sarathi-Serve](https://arxiv.org/abs/2403.02310), OSDI 2024: chunked
-   prefill and the per-step token budget. Finding 2 measures that trade-off directly.
+   measures that interference within one engine.
+3. Agrawal et al., [Sarathi-Serve](https://arxiv.org/abs/2403.02310), OSDI 2024: chunked
+   prefill and the per-step token budget. Finding 3 measures that trade-off directly.
+4. Agrawal et al., [Vidur](https://arxiv.org/abs/2405.05465), MLSys 2024: predicts
+   iteration time from profiled operator costs. Finding 4's step-cost model is a small
+   instance.
 5. Agrawal et al., [Etalon](https://arxiv.org/abs/2407.07000), 2024: averaged metrics
    such as TPOT hide jitter. Here, the token budget with the best median ITL has the
    worst p99.
-6. Dean and Barroso, [The Tail at Scale](https://doi.org/10.1145/2408776.2408794), CACM
-   2013: why tail latency, not the average, shapes user experience.
-7. Hoefler and Belli,
+6. Hoefler and Belli,
    [Scientific Benchmarking of Parallel Computing Systems](https://doi.org/10.1145/2807591.2807644),
    SC 2015: the reporting and repetition practices this study follows.
-8. NVIDIA, [Multi-Process Service](https://docs.nvidia.com/deploy/mps/index.html) and
-   [GPU time slicing](https://docs.nvidia.com/datacenter/cloud-native/gpu-operator/latest/gpu-sharing.html):
-   the GPU-sharing mechanisms behind the contention scenario.
+7. Schroeder et al.,
+   [Open Versus Closed: A Cautionary Tale](https://www.usenix.org/legacy/event/nsdi06/tech/schroeder.html),
+   NSDI 2006: closed-loop load generators hide queueing, which bounds findings 2 and 5.
 
 Each report has a related-evidence section that checks its findings against these and
 other sources; the [Phase C report](reports/milestone3-20261003T201214Z-phase-c.md) is

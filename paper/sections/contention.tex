@@ -4,7 +4,7 @@
 We also ran a co-located synthetic GPU job alongside the prefill-heavy workload, with a
 sham condition and a recovery baseline. The job was busy for 25\% or 50\% of each
 100\,ms period, its kernels ran 14\% and 28\% of the time, and the two processes
-shared the GPU by time-slicing \citep{nvidiatimeslicing}. At the 50\% setting, the job
+shared the GPU by time-slicing. At the 50\% setting, the job
 cost 13--15\% in end-to-end latency and slowed requests even at C1, where it slowed
 prefill more than decode (+22.5\% against +11.3\%). We have no tested explanation for
 that difference; a post hoc check found the GPU clock 3--4\% lower under contention at
