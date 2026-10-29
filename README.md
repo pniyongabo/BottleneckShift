@@ -12,6 +12,10 @@ timings, and from GPU/CPU telemetry. The goal is experimental diagnosis. Everyth
 here uses public software, generated prompts, and independent experiments, with no
 proprietary code, data, or results.
 
+**Technical report:** [Where Does the Time Go? A Pre-Registered Study of Per-Step Cost
+in LLM Inference Serving](paper/bottleneckshift-report.pdf) (PDF, 9 pages plus
+references; source in [`paper/`](paper/)).
+
 ## Why it matters
 
 Serving systems are tuned for different goals. DistServe, for example, sets separate
@@ -41,18 +45,22 @@ All on one GPU with a 0.5B model (Qwen2.5-0.5B-Instruct on an RTX A4000).
    in prefill and about 122 ms in its 31 generation steps. At 8 concurrent requests,
    much of a request's decode time is spent in steps that also carry other requests'
    prefill chunks. ([Phase B](reports/milestone3-20261003T180358Z-phase-b.md))
-2. **Past saturation, added latency moves into per-step time, not into the wait for the
-   first token.** From 8 to 32 concurrent requests, median inter-token latency (ITL)
-   rises from 4.9 to 55 ms, while the share of latency before the first token falls
-   from 0.44 to 0.24, against the pre-registered prediction. Changing vLLM's per-step
-   token budget reshapes this cost: at 32 requests, 8192 tokens gives a 7 ms median ITL
-   and 18% more throughput but a 169 ms p99, while 512 evens out ITL but triples TTFT.
-   A follow-up pilot that logged every engine step confirmed that a step's cost tracks
-   the tokens it schedules (about 6 ms for a decode-only step, 55 ms for a full
-   2048-token step) and that the budget sets the scale of the tail. Its primary tail
-   prediction failed in one part: short prompts were packed two per step instead of
-   making steps smaller. A second part showed that a chunk's cost also grows with its
-   context: a 1024-token chunk took 19.5 ms at context 1024 and 36 ms at context 7168.
+2. **From 8 to 32 concurrent requests, past saturation, added latency moves into
+   per-step time.** Median inter-token latency (ITL) rises from 4.9 to 55 ms, while the
+   share of latency before the first token falls from 0.44 to 0.24, against the
+   pre-registered prediction. The shift is bounded: once every step is full, further
+   load must go into the wait for the first token. Changing vLLM's per-step token
+   budget reshapes this cost: at 32 requests, 8192 tokens gives a 7 ms median ITL and
+   18% more throughput but a 169 ms p99, while 512 evens out ITL but triples TTFT, and
+   queueing takes two thirds of each request's latency. A follow-up pilot that logged
+   every engine step showed that the budget sets the scale of the tail at 32 requests.
+   Its primary tail prediction failed in one part: short prompts were packed two per
+   step instead of making steps smaller. Its test of whether a step's cost tracks the
+   tokens it schedules passed at 32 requests, but the step timing it used turned out to
+   be confounded with the previous step, and the same test was rejected at 8 requests.
+   A second part timed each prompt chunk directly, one request at a time, and showed
+   that a chunk's cost grows with its context, in line with a count of attention FLOPs:
+   a 1024-token chunk took 19.5 ms at context 1024 and 36 ms at context 7168.
    ([Phase C](reports/milestone3-20261003T201214Z-phase-c.md),
    [Phase D](reports/milestone3-20261006T022744Z-phase-d.md),
    [Milestone 5 pilot](reports/milestone5-20261025T004640Z-pilot.md),
@@ -60,7 +68,7 @@ All on one GPU with a 0.5B model (Qwen2.5-0.5B-Instruct on an RTX A4000).
 3. **Under closed-loop load, GPU contention looks different from added load.** A
    co-located process at a 50% duty cycle costs 13–15% end-to-end latency. It slows
    single requests too and, with one request at a time, slows prefill more than decode,
-   while `nvidia-smi` utilization moves only 1–6 points. At 8 requests, queue time rose
+   while `nvidia-smi` utilization, already near 90%, moves only 1–6 points. At 8 requests, queue time rose
    only 6%, against the pre-registered prediction that it would rise more than prefill.
    ([Phase C](reports/milestone3-20261003T201214Z-phase-c.md))
 
@@ -76,7 +84,8 @@ More figures, including the contention series: [`reports/figures/`](reports/figu
   ([`experiments/`](experiments/roadmap.md)), and every report scores every prediction,
   including the ones that failed. Milestones 1 and 2 state expected signatures;
   numbered predictions and falsification criteria start with Milestone 3.
-- **One factor at a time,** in forward and reverse order, with three repetitions. From
+- **One factor at a time,** with three repetitions, in forward and reverse order where
+  the design allows. From
   Milestone 2 onward, runs use a pinned model revision, prefix caching off, and
   explicit sampling.
 - **Three views of every run from Milestone 3 onward:** client request timings, vLLM's

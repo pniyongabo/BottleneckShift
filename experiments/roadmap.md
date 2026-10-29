@@ -140,11 +140,12 @@ this time to strengthen Milestone 3 and the final report.
 **Milestone 5 pilot: complete (C32 block), October 25, 2026**
 ([protocol](milestone5.md), [report](../reports/milestone5-20261025T004640Z-pilot.md)).
 It varied prompt length (1024, 2048, 4096) against the token budget (2048, 8192) at
-C32 and logged each engine step's scheduled tokens with an opt-in vLLM plugin. Step
-cost tracks step size (large steps 9.8× small ones; Spearman 0.87), and the budget sets
-the scale of the ITL tail (B8192 about 3× B2048). The primary tail prediction failed in
+C32 and logged each engine step's scheduled tokens with an opt-in vLLM plugin. The
+step-size prediction passed (large steps 9.8× small ones; Spearman 0.87), but its step
+interval is confounded with the previous step (see the report's correction of October
+28), and the budget sets the scale of the ITL tail (B8192 about 3× B2048). The primary tail prediction failed in
 its L1024 part: the scheduler packed two 1024-token prompts into one 2048-token step.
-Seven of eight C32 predictions held; the optional C8 block was not run.
+Six of the seven C32 predictions held; the optional C8 block was not run.
 
 **Milestone 5 Part 2: complete, October 29, 2026** (addendum in the
 [protocol](milestone5.md), [report](../reports/milestone5p2-20261029T000043Z-part2.md)). The context-length test (C1, 8192-token
@@ -153,7 +154,8 @@ context: the deepest chunks cost 1.44× and 1.62× the first, with a Spearman co
 of 0.96. In the C8 block, concurrency moved the median as predicted (about 5 ms at C8
 against 55 ms at C32 for B2048), but the tail prediction failed for the same packing
 reason as at C32. Prediction 2's rank statistic also failed at C8 (Spearman 0.57,
-against 0.7), although the large/small ratio held (9.0×).
+against 0.7), although the large/small ratio held (9.0×), so the pre-registered rule
+rejects the step-size clause at C8.
 
 These are the original planned stages, kept as later milestones. Milestone 3 takes a
 deliberately narrow slice of them: two workload regimes and one contention
@@ -200,5 +202,6 @@ it, drop Milestone 4 first.
 
 The final public artifact should contain reproducible configs, raw-data provenance,
 analysis scripts, approximately four strong figures, a clear limitations section,
-and a 5–7 page technical report if time permits. Use only public resources and
+and a 5–7 page technical report if time permits. The technical report is done:
+[`paper/bottleneckshift-report.pdf`](../paper/bottleneckshift-report.pdf) (October 2026). Use only public resources and
 independent results.

@@ -2,6 +2,9 @@
 
 ## Result
 
+*Correction (2026-10-28): the step-cost result below rests on a step interval that is
+confounded with the previous step; see [Correction](#correction-2026-10-28).*
+
 A per-step scheduler log confirmed, for the first time in this study, that **an engine
 step's cost tracks the number of tokens it schedules.** Pooled over the seven series,
 steps with at least 1024 tokens took a median 56 ms against 5.7 ms for steps with at
@@ -22,8 +25,34 @@ smaller. Those packed steps were cheaper (45 ms against 55.5 ms for the same 204
 tokens), which points to a second factor beyond the token count, the prompt's context
 length. That reading is post hoc.
 
-Seven of the eight C32-block predictions held, and the anchor reproduces Phase D within
+Six of the seven C32-block predictions held, and the anchor reproduces Phase D within
 0.5%. The optional C8 block was not run, so predictions 8–10 are not scored.
+
+## Correction (2026-10-28)
+
+A later review found that the step interval used here is confounded with the previous
+step, which weakens the step-cost result above.
+
+- **Mechanism.** vLLM 0.29.0 can schedule step n+1 before it processes step n's
+  results, so the interval from step n's scheduling call to the next one partly
+  reflects how long step n−1 took. The measurement note below already found that the
+  previous step's tokens correlate better with the interval (0.92) than the step's own
+  (0.87).
+- **Evidence that intervals are not a step's own cost.** In Part 2's C8 block, steps of
+  at least 1024 tokens at L1024/B8192 had a median interval of 16.5 ms, while Part 2's
+  execution-time measurement put a single 1024-token chunk at 19.5 ms or more at every
+  context. Here, in len1024-budget8192, prompt-carrying steps had a median of 4098
+  tokens but large steps a median interval of 46.3 ms, about what one 2048-token chunk
+  costs alone (41.7 ms).
+- **Prediction 2.** It stays scored as confirmed under the pre-registered measure, but
+  that is weak evidence that a step's own cost tracks its tokens. At C32,
+  prompt-carrying steps come in runs, so a lagged measure still separates large steps
+  from small ones. This log has no execution times, so the C32 result cannot be
+  recomputed.
+- **The context reading is withdrawn.** The 45 against 55.5 ms comparison (L1024 against
+  L2048 at B2048) cannot reflect context, because both steps start at context 0. The
+  gap follows the share of steps that carry prompt work (38% against 77%), as a lagged
+  measure would. Part 2 tested context separately, with execution time.
 
 ## Terms used in this report
 

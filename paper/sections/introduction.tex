@@ -1,0 +1,41 @@
+\section{Introduction}
+\label{sec:intro}
+
+LLM serving systems batch many requests through one model. Each engine step generates
+one token for every running request and may also process part of a new request's
+prompt \citep{yu2022orca,kwon2023vllm,agrawal2024sarathiserve}. Service targets are
+usually written in terms of time to first token (TTFT) and time per output token
+\citep{zhong2024distserve}. A user feels both the wait for the first token and how
+smoothly the rest stream. An operator who sees latency rise therefore needs to know
+which phase grew and why. Past saturation the excess work is the same either way. The
+scheduler decides whether it appears as waiting before the first token or as slower
+steps, and its settings move it between the two.
+
+This report asks under which conditions the dominant source of client-visible delay
+changes, and which measurements can tell the causes apart. We
+answer it for one setup, vLLM serving Qwen2.5-0.5B-Instruct on one RTX A4000. We use a
+method designed to make negative results visible. Each experiment's predictions and
+thresholds were published before its data were collected, runs were measured from
+three independent views, and every prediction was scored afterward, including the
+ones that failed.
+
+Our contributions are:
+\begin{itemize}
+  \item \emph{A pre-registered, three-view measurement method} for LLM serving, with
+    an opt-in per-step scheduler log that records how many tokens each engine step
+    processed and when its results returned (Section~\ref{sec:method}).
+  \item \emph{Where latency goes under load:} from C8 to C32, past saturation, the
+    added latency appears as per-step time while the share before the first token
+    falls, and a capacity argument bounds how far this extends
+    (Section~\ref{sec:load}).
+  \item \emph{The token budget as a median-versus-tail trade:} at C32 the budget sets
+    the scale of the inter-token latency tail, and the smallest budget moves the delay
+    into the queue (Section~\ref{sec:budget}).
+  \item \emph{What sets the cost of a step:} context, measured directly for single
+    chunks and consistent with a FLOP count, and what the step log could and could
+    not show about scheduled tokens (Section~\ref{sec:stepcost}).
+  \item \emph{A prediction ledger:} all 59 scored predictions and what the 19 that did
+    not fully hold taught us (Section~\ref{sec:ledger}).
+\end{itemize}
+The code, configurations, protocols, and reports are public.\footnote{\url{https://github.com/pniyongabo/BottleneckShift}}
+% src: ledger counts (40 confirmed, 4 mixed, 14 not confirmed, 1 not testable)

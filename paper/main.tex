@@ -1,0 +1,46 @@
+% BottleneckShift technical report. Build: paper/build.sh (Tectonic).
+% Every number in the text cites its source report in a comment ("src:").
+\documentclass[10pt]{article}
+\usepackage[margin=1in]{geometry}
+\usepackage[T1]{fontenc}
+\usepackage{lmodern}
+\usepackage{microtype}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{tabularx}
+\usepackage{amsmath}
+\usepackage[numbers,sort&compress]{natbib}
+\usepackage[hidelinks]{hyperref}
+\usepackage{xcolor}
+\usepackage{enumitem}
+\setlist{nosep,leftmargin=*}
+\usepackage{caption}
+\captionsetup{font=small,skip=4pt}
+\setlength{\textfloatsep}{10pt plus 2pt minus 2pt}
+\graphicspath{{figures/}}
+\newcommand{\ms}{\,ms}
+
+\title{Where Does the Time Go? A Pre-Registered Study of Per-Step Cost in LLM Inference Serving}
+\author{Patrick Niyongabo\\Independent researcher, Portland, Oregon\\\url{https://github.com/pniyongabo/BottleneckShift}}
+\date{October 2026}
+
+\begin{document}
+\maketitle
+
+\input{sections/abstract}
+\input{sections/introduction}
+\input{sections/background}
+\input{sections/method}
+\input{sections/load}
+\input{sections/budget}
+\input{sections/stepcost}
+\input{sections/contention}
+\input{sections/ledger}
+\input{sections/cost}
+\input{sections/validity}
+\input{sections/related}
+\input{sections/conclusion}
+
+\bibliographystyle{plainnat}
+\bibliography{refs}
+\end{document}

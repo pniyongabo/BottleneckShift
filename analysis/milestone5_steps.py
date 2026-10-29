@@ -165,7 +165,7 @@ def figure(rows: list[dict], series_pairs: dict[str, list], output: Path) -> Non
               title="Engine steps at C32 (all measured runs)")
     right.legend(fontsize=8)
     fig.tight_layout()
-    fig.savefig(output, dpi=150)
+    fig.savefig(output, dpi=150, **({"metadata": {"CreationDate": None}} if output.suffix == ".pdf" else {}))
 
 
 def main() -> int:

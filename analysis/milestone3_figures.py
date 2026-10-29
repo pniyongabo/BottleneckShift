@@ -70,10 +70,10 @@ def crossover_figure(rows: list[dict], output: Path, plt) -> None:
         axis.set(title=title, xlabel="Max client concurrency", xscale="log", xticks=[1, 8, 16, 32])
         axis.set_xticklabels(["C1", "C8", "C16", "C32"])
         axis.legend(fontsize=7)
-    figure.suptitle("prefill_heavy (2048 in / 32 out): throughput saturates by C16; the extra latency moves "
-                    "into per-step time, not before the first token", fontsize=10)
+    figure.suptitle("prefill_heavy (2048 in / 32 out): throughput saturates by C16, and the extra latency "
+                    "moves into per-step time", fontsize=10)
     figure.tight_layout()
-    figure.savefig(output, dpi=150)
+    figure.savefig(output, dpi=150, **save_options(output))
     plt.close(figure)
 
 
@@ -105,7 +105,7 @@ def contention_figure(series_rows: dict[str, list[dict]], output: Path, plt) -> 
     figure.suptitle("GPU contention (prefill_heavy): latency rises with duty cycle; sham and recovery match "
                     "the baseline; utilization barely moves", fontsize=10)
     figure.tight_layout()
-    figure.savefig(output, dpi=150)
+    figure.savefig(output, dpi=150, **save_options(output))
     plt.close(figure)
 
 
@@ -135,7 +135,7 @@ def sweep_figure(rows: list[dict], output: Path, plt) -> None:
     figure.suptitle("Phase D sweep (prefill_heavy, default 2048-token budget): per-step latency jumps between C16 "
                     "and C24 as throughput plateaus", fontsize=10)
     figure.tight_layout()
-    figure.savefig(output, dpi=150)
+    figure.savefig(output, dpi=150, **save_options(output))
     plt.close(figure)
 
 
@@ -166,8 +166,13 @@ def budget_figure(series_rows: dict[str, list[dict]], output: Path, plt) -> None
     figure.suptitle("Phase D token budget (max_num_batched_tokens): small budgets give frequent small stalls, "
                     "large budgets rare large ones", fontsize=10)
     figure.tight_layout()
-    figure.savefig(output, dpi=150)
+    figure.savefig(output, dpi=150, **save_options(output))
     plt.close(figure)
+
+
+def save_options(output: Path) -> dict:
+    """PDF output without a creation date, so rebuilt figures are byte-identical."""
+    return {"metadata": {"CreationDate": None}} if output.suffix == ".pdf" else {}
 
 
 def main() -> int:
@@ -176,6 +181,7 @@ def main() -> int:
     parser.add_argument("pair_id")
     parser.add_argument("--output-dir", type=Path, required=True)
     parser.add_argument("--phase", choices=("c", "d"), default="c")
+    parser.add_argument("--format", choices=("png", "pdf"), default="png")
     args = parser.parse_args()
     import matplotlib
     matplotlib.use("Agg")
@@ -188,12 +194,12 @@ def main() -> int:
     args.output_dir.mkdir(parents=True, exist_ok=True)
     if args.phase == "c":
         crossover = [row for name in CROSSOVER if name in series for row in series[name]]
-        crossover_figure(crossover, args.output_dir / "milestone3-phase-c-crossover.png", plt)
-        contention_figure(series, args.output_dir / "milestone3-phase-c-contention.png", plt)
+        crossover_figure(crossover, args.output_dir / f"milestone3-phase-c-crossover.{args.format}", plt)
+        contention_figure(series, args.output_dir / f"milestone3-phase-c-contention.{args.format}", plt)
     else:
         sweep = [row for name in SWEEP if name in series for row in series[name]]
-        sweep_figure(sweep, args.output_dir / "milestone3-phase-d-sweep.png", plt)
-        budget_figure(series, args.output_dir / "milestone3-phase-d-budget.png", plt)
+        sweep_figure(sweep, args.output_dir / f"milestone3-phase-d-sweep.{args.format}", plt)
+        budget_figure(series, args.output_dir / f"milestone3-phase-d-budget.{args.format}", plt)
     print(f"wrote figures to {args.output_dir}")
     return 0
 

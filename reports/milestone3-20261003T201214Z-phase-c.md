@@ -225,8 +225,10 @@ At duty 0.25 the changes are about half as large.
   - At C32 the steady state always has some prefill in flight, so nearly every step
     becomes a prefill-sized step. The ITL median rising to roughly the ITL p99 at C8
     (~45–55 ms) fits this.
-  - This matches the mechanism the literature describes: chunked prefill trades
-    higher TTFT for "generation stalls", i.e. inflated time between tokens (see the
+  - This matches the mechanism the literature describes: batching prefill work with
+    decodes inflates the time between tokens, which Sarathi-Serve calls "generation
+    stalls" when long prefills run unchunked; chunking bounds the stall at the cost of
+    slightly higher TTFT (see the
     [Phase B report's](milestone3-20261003T180358Z-phase-b.md) related-evidence
     section, references 3–5).
 
@@ -252,10 +254,15 @@ At duty 0.25 the changes are about half as large.
   The small queue rise under contention is the falsified half of prediction 3, which
   expected queue time to rise proportionally more than prefill.
 
-  At C1, contention slows prefill (+23%) about twice as much as decode (+11%). That
-  fits a compute-bound matmul generator competing mostly with compute-bound prefill,
-  with memory-bound decode less exposed. No published source tests this asymmetry,
-  so it remains this study's observation.
+  At C1, contention slows prefill (+23%) about twice as much as decode (+11%). No
+  published source tests this asymmetry, so it remains this study's observation.
+  (Correction, 2026-10-28: an earlier version explained it as a compute-bound generator
+  competing with compute-bound prefill. Without MPS, separate processes time-slice the
+  GPU and their kernels do not run at the same moment, so that explanation does not
+  apply. Candidate explanations, all untested: a large host-side share in the 3.9 ms
+  decode step, which time-slicing does not slow; decode running as CUDA graphs while
+  prefill launches many kernels; and how a 40 ms prefill and a 4 ms decode step fall
+  against the time slice.)
 
   The small queue rise is partly a property of the load generator. With closed-loop load
   (`--max-concurrency`), requests in flight are capped, so slower service cannot
@@ -286,11 +293,11 @@ synthetic matmul load.
 | Finding | Verdict | Evidence |
 |---|---|---|
 | Throughput saturates between C8 and C16; queue time grows sub-linearly | **Supports** | Throughput "generally saturates around the maximum batch size" while latency keeps rising [B8, B9]. Past the compute-bound point, more users "just delays everyone with no benefit of throughput" [B19, see also B18]. Step time "grows roughly with B" above saturation [B3]. Sub-linear queue growth is expected under closed-loop load, which caps requests in flight [P3, B7]. |
-| Past saturation the cost moves into per-step time; a phase-share metric cannot show it | **Supports** | Mixed batches make step time rise with prefill tokens: "generation stalls", and time between tokens up to 28.3× higher [P1 §1, §4.2–4.3]. "Adding a single prefill job to a batch of decoding requests significantly slows down both" [P2 §2.3]. vLLM V1 schedules prefill and decode within one token budget, with no prefill/decode distinction [B1, B3]. Its documentation states that smaller `max_num_batched_tokens` "achieve better ITL because there are fewer prefills slowing down decodes" [B4]. Averaged metrics such as TPOT "hide jitters in token generation" [R1 §3.1], matching the conclusion that per-step distributions are needed. |
+| Past saturation the cost moves into per-step time; a phase-share metric cannot show it | **Supports** | Mixed batches make step time rise with prefill tokens: "generation stalls", with time between tokens up to 28.3× higher when long prefills are batched without chunking [P1 §1, §4.2–4.3]; under chunked prefill the budget bounds this inflation. "Adding a single prefill job to a batch of decoding requests significantly slows down both" [P2 §2.3]. vLLM V1 schedules prefill and decode within one token budget, with no prefill/decode distinction [B1, B3]. Its documentation states that smaller `max_num_batched_tokens` "achieve better ITL because there are fewer prefills slowing down decodes" [B4]. Averaged metrics such as TPOT "hide jitters in token generation" [R1 §3.1], matching the conclusion that per-step distributions are needed. |
 | Closed-loop waves make per-run medians unstable | **Qualifies** | Closed-loop load, sending requests in "rounds", and coordinated omission are all documented [P3, B7, B17, B20]. No source reports multimodal medians specifically; that is this study's observation. Closed-loop testing also understates tails [B20], and common metrics can be gamed [R2]. |
-| GPU contention: C1 slows, C8 queue rises only 6%, prefill slows more than decode at C1 | **Qualifies** | Time-slicing gives "an equal share of time to all GPU processes" with no isolation [B13], at "a cost for context-switching" that brings "increased latency, jitter" [B14]. This fits the similar prefill and decode slowdowns at C8. Interference from co-executing workloads on inference tails is documented [R3, R4]. MPS would run the kernels concurrently instead of time-slicing them [B12]. No source covers the prefill > decode asymmetry at C1, and the small queue rise is partly a closed-loop effect (see interpretation) [P2 §3.1]. |
+| GPU contention: C1 slows, C8 queue rises only 6%, prefill slows more than decode at C1 | **Qualifies** | Time-slicing gives "an equal share of time to all GPU processes" with no isolation [B13], at "a cost for context-switching" that brings "increased latency, jitter" [B14]. This fits the similar prefill and decode slowdowns at C8. Interference from co-executing workloads on inference tails is documented [P4, R3]. MPS would run the kernels concurrently instead of time-slicing them [B12]. No source covers the prefill > decode asymmetry at C1, and the small queue rise is partly a closed-loop effect (see interpretation) [P2 §3.1]. |
 | `nvidia-smi` utilization is a weak signal | **Supports** | NVML utilization is the "percent of time … during which one or more kernels was executing" [B10], so the generator's kernels count as busy time too. DCGM's SM activity, "0.8 or greater is necessary, but not sufficient", is the documented finer metric [B11]. Practitioners call the utilization counter "misleading" [B15, B16]. |
-| Client–server TTFT gap grows with load and is flat under GPU contention | **Supports, with a caveat** | vLLM's TTFT starts when tokenization begins in the frontend, while queue time is measured in the engine core, which "the frontend does not have visibility into" [B5]. Tokenization, detokenization, and streaming run outside the engine core [B1]. Frontend cost has been large: the HTTP server was "33% of the total execution time" before the V1 process split [B2], and "the API server process can become a bottleneck" [B6]. Caveat: the client shares the host's CPUs, and under CPU interference existing serving systems "degrade by up to two orders of magnitude" [R5]. |
+| Client–server TTFT gap grows with load and is flat under GPU contention | **Supports, with a caveat** | vLLM's TTFT starts when tokenization begins in the frontend, while queue time is measured in the engine core, which "the frontend does not have visibility into" [B5]. Tokenization, detokenization, and streaming run outside the engine core [B1]. Frontend cost has been large: the HTTP server was "33% of the total execution time" before the V1 process split [B2], and "the API server process can become a bottleneck" [B6]. Caveat: the client shares the host's CPUs, and under CPU interference existing serving systems "degrade by up to two orders of magnitude" [R4]. |
 
 **Taken together:** the saturation and per-step findings match established results. This
 study adds measurements on a small model with a bandwidth-limited workstation GPU, and
@@ -306,14 +313,14 @@ intervention is the test vLLM's own documentation implies [B4].
 - [P1] A. Agrawal et al., "Taming Throughput-Latency Tradeoff in LLM Inference with Sarathi-Serve," OSDI 2024. https://arxiv.org/abs/2403.02310
 - [P2] Y. Zhong et al., "DistServe: Disaggregating Prefill and Decoding for Goodput-optimized Large Language Model Serving," OSDI 2024. https://arxiv.org/abs/2401.09670
 - [P3] B. Schroeder, A. Wierman, M. Harchol-Balter, "Open Versus Closed: A Cautionary Tale," NSDI 2006. https://www.usenix.org/legacy/event/nsdi06/tech/schroeder.html
+- [P4] W. Zhao et al., "Tally: Non-Intrusive Performance Isolation for Concurrent Deep Learning Workloads," ASPLOS 2025. https://arxiv.org/abs/2410.07381
 
 **Preprints (arXiv)**
 
 - [R1] A. Agrawal et al., "Etalon: Holistic Performance Evaluation Framework for LLM Inference Systems," arXiv 2407.07000, 2024. https://arxiv.org/abs/2407.07000
 - [R2] Z. Wang et al., "Revisiting Service Level Objectives and System Level Metrics in Large Language Model Serving," arXiv 2410.14257, 2024. https://arxiv.org/abs/2410.14257
-- [R3] W. Zhao et al., "Tally: Non-Intrusive Performance Isolation for Concurrent Deep Learning Workloads," arXiv 2410.07381, 2024. https://arxiv.org/abs/2410.07381
-- [R4] J. J. Martín et al., "Performance Isolation for Inference Processes in Edge GPU Systems," arXiv 2601.07600, 2026. https://arxiv.org/abs/2601.07600
-- [R5] M. Siavashi et al., "Blink: CPU-Free LLM Inference by Delegating the Serving Stack to GPU and SmartNIC," arXiv 2604.07609, 2026. https://arxiv.org/abs/2604.07609
+- [R3] J. J. Martín et al., "Performance Isolation for Inference Processes in Edge GPU Systems," arXiv 2601.07600, 2026. https://arxiv.org/abs/2601.07600
+- [R4] M. Siavashi et al., "Blink: CPU-Free LLM Inference by Delegating the Serving Stack to GPU and SmartNIC," arXiv 2604.07609, 2026. https://arxiv.org/abs/2604.07609
 
 **Engineering blogs and documentation (not peer-reviewed)**
 
@@ -324,7 +331,7 @@ intervention is the test vLLM's own documentation implies [B4].
 - [B5] vLLM documentation, "Metrics" (design). https://docs.vllm.ai/en/latest/design/metrics.html
 - [B6] vLLM documentation, "Data Parallel Deployment." https://docs.vllm.ai/en/latest/serving/data_parallel_deployment.html
 - [B7] vLLM documentation, "vllm bench serve." https://docs.vllm.ai/en/latest/cli/bench/serve.html
-- [B8] NVIDIA Technical Blog, "LLM Inference Benchmarking: Fundamental Concepts," Apr 2, 2025. https://developer.nvidia.com/blog/llm-benchmarking-fundamental-concepts/
+- [B8] V. Nguyen et al., "LLM Inference Benchmarking: Fundamental Concepts," NVIDIA Technical Blog, Apr 2, 2025. https://developer.nvidia.com/blog/llm-benchmarking-fundamental-concepts/
 - [B9] NVIDIA NIM documentation, "Metrics and Parameters" (benchmarking). https://docs.nvidia.com/nim/benchmarking/llm/latest/metrics.html
 - [B10] NVIDIA, "nvidia-smi" documentation (Utilization). https://docs.nvidia.com/deploy/nvidia-smi/index.html
 - [B11] NVIDIA DCGM documentation, "Profiling Metrics." https://docs.nvidia.com/datacenter/dcgm/latest/user-guide/feature-overview.html
@@ -332,9 +339,9 @@ intervention is the test vLLM's own documentation implies [B4].
 - [B13] NVIDIA GPU Operator documentation, "Time-Slicing GPUs in Kubernetes." https://docs.nvidia.com/datacenter/cloud-native/gpu-operator/latest/gpu-sharing.html
 - [B14] K. Klues et al., "Improving GPU Utilization in Kubernetes," NVIDIA Technical Blog, Jun 16, 2022. https://developer.nvidia.com/blog/improving-gpu-utilization-in-kubernetes/
 - [B15] R. Baviskar, "GPU Utilization is a Misleading Metric," Trainy blog, Feb 24, 2025. https://trainy.ai/blog/gpu-utilization-misleading-metric
-- [B16] C. Frye, "GPU utilization guide," Modal, Feb 24, 2025. https://modal.com/blog/gpu-utilization-guide
+- [B16] C. Frye, "'I paid for the whole GPU, I am going to use the whole GPU': A high-level guide to GPU utilization," Modal blog, Feb 24, 2025. https://modal.com/blog/gpu-utilization-guide
 - [B17] W. Kadous et al., "Reproducible Performance Metrics for LLM inference," Anyscale blog, Nov 1, 2023. https://www.anyscale.com/blog/reproducible-performance-metrics-for-llm-inference
-- [B18] Databricks/MosaicML, "LLM Inference Performance Engineering: Best Practices," Databricks blog, Oct 12, 2023. https://www.databricks.com/blog/llm-inference-performance-engineering-best-practices
+- [B18] M. Agarwal et al., "LLM Inference Performance Engineering: Best Practices," Databricks blog, Oct 12, 2023. https://www.databricks.com/blog/llm-inference-performance-engineering-best-practices
 - [B19] D. Thomas, "Benchmarking Text Generation Inference," Hugging Face blog, May 29, 2024. https://huggingface.co/blog/tgi-benchmarking
 - [B20] G. Tene, "wrk2" README (coordinated omission). https://github.com/giltene/wrk2
 
@@ -354,7 +361,7 @@ intervention is the test vLLM's own documentation implies [B4].
   P3]. Percentiles from these runs are therefore not artifact-free either.
 - The client runs on the server's 4 vCPUs. The growing client–server TTFT gap
   therefore cannot separate client-side overhead from API-server overhead. Host CPU
-  contention is known to hurt existing serving systems badly [R5].
+  contention is known to hurt existing serving systems badly [R4].
 - Contention ran in a fixed dose order. The sham/recovery bracketing and the
   monotonic pattern argue against drift, but order and dose are not fully separated.
 - One host and one model. Sampler overhead is still unmeasured (no telemetry-off

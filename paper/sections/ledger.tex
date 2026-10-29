@@ -1,0 +1,69 @@
+\section{The prediction ledger}
+\label{sec:ledger}
+
+Table~\ref{tab:ledger} counts every scored prediction by phase. Of 59 verdicts, 40
+were confirmed, 4 were mixed, 14 were not confirmed, and 1 could not be tested with
+our instruments. We group the misses below by what caused them; the reports discuss
+each one, including those that fit no group, such as the order of TTFT across
+budgets.
+
+\begin{table}[t]
+  \centering
+  \caption{Scored predictions by phase. Phase B scores ten signatures for each of two
+    workload regimes. Milestone 5's C8 predictions are counted in Part~2. Where a
+    report gives a split or qualified verdict (Phase D predictions 2 and 7), we count
+    it as mixed.}
+  \label{tab:ledger}
+  \begin{tabular}{lrrrrr}
+    \toprule
+    Phase & Scored & Confirmed & Mixed & Not confirmed & Not testable \\
+    \midrule
+    B: workload regimes          & 20 & 14 & 0 & 5 & 1 \\
+    C: concurrency crossover     & 5  & 3  & 0 & 2 & 0 \\
+    C: GPU contention            & 7  & 4  & 2 & 1 & 0 \\
+    D: sweep and token budget    & 11 & 6  & 2 & 3 & 0 \\
+    Milestone 5, C32 block       & 7  & 6  & 0 & 1 & 0 \\
+    Milestone 5, Part 2          & 9  & 7  & 0 & 2 & 0 \\
+    \midrule
+    Total                        & 59 & 40 & 4 & 14 & 1 \\
+    \bottomrule
+  \end{tabular}
+  % src: ledger built from each report's prediction table; verdict words as stated in each report, except Phase D 2 ("met as specified, uninformative") and 7 ("not confirmed for p50; confirmed for p99"), counted as mixed
+\end{table}
+
+\paragraph{The hypothesis was wrong.}
+We predicted that the prefill-heavy workload would be dominated by prefill, which a
+cost estimate refutes (Section~\ref{sec:load}), and that time before the first token
+would dominate past saturation, when the added work went into fuller steps instead.
+The step-size account predicted that prompts shorter than the budget would make steps
+smaller; the scheduler packed them, at both C32 and C8. The budget cap itself behaved
+as predicted.
+
+\paragraph{The instrument could not see the effect.}
+vLLM's iteration-token histogram could not show per-step chunk sizes, so Phase D's
+manipulation check failed as specified and its step-size test was inconclusive. That
+miss led to the per-step log. \texttt{nvidia-smi} utilization is a busy fraction
+averaged over the driver's own sample period \citep{nvidiasmi}, so no polling rate
+could resolve 40\,ms prefills; we did not replace it. The step log's interval then
+turned out to be confounded with the previous step (Section~\ref{sec:stepcost}), and
+Part~2's execution time corrects this at C8 and C1 only.
+
+\paragraph{The scheduler and the load generator shaped the result.}
+Two queue predictions missed: queue growth past saturation was sub-linear (not
+confirmed), and contention raised queue time less than prefill time (mixed). Both fit
+vLLM's policy of scheduling running requests first and filling the rest of the budget
+with waiting prompts, which turns waiting into longer steps. The closed-loop client
+also caps how many requests can wait.
+
+\paragraph{A test was too strict for its data.}
+The rank correlation between step size and step interval cleared its threshold at C32
+(0.87) but not at C8 (0.57). Forward and reverse condition orders differed by
+0.1--2.5\% in latency and throughput, enough to fail a strict range-overlap test in
+the first workload phase. With three runs per order, two ranges fail to overlap by
+chance one time in ten for each metric even without an order effect, so across about
+ten metrics a few failures were expected.
+
+Scoring every prediction changed the study. The per-step crossover and the context
+measurements were tested directly only because an earlier prediction failed or
+prompted a post hoc reading.
+% src: ledger section (lessons as stated in each report); Phase B stable-signature row; 2 x 3!3!/6! = 0.1

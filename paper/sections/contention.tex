@@ -1,0 +1,22 @@
+\section{A secondary finding: GPU contention}
+\label{sec:contention}
+
+We also ran a co-located synthetic GPU job alongside the prefill-heavy workload, with a
+sham condition and a recovery baseline. The job was busy for 25\% or 50\% of each
+100\,ms period, and its kernels ran 14\% and 28\% of the time. The two processes share
+the GPU by time-slicing \citep{nvidiatimeslicing}. At the 50\% setting:
+\begin{itemize}
+  \item the job cost 13--15\% in end-to-end latency;
+  \item it slowed requests even at C1, and at C1 it slowed prefill more than decode
+    (+22.5\% against +11.3\%); we have no tested explanation for the difference;
+  \item mean \texttt{nvidia-smi} utilization moved by only 1--6 points, against a
+    3.5-point spread between identical control runs. Without contention it was
+    already about 90\% at C1 and higher at C8, which leaves little room to move.
+\end{itemize}
+Of seven predictions, four held, two were mixed, and one failed. Utilization stayed
+within 5 points at C1 but moved 6.0 points at C8. Queue time at C8 rose only 6\%,
+less than prefill (+17\%), against the prediction. The share of latency before the
+first token did not rise, which was the one outright failure. We state this contrast
+with added load for our closed-loop client; an open-loop test would check it. Near its
+ceiling, utilization is a poor detector of this interference \citep{nvidiasmi}.
+% src: reports/milestone3-20261003T201214Z-phase-c.md (Result; validation table: kernel duty 0.142 at 0.25; Part 2 table: control utilization 88.3-91.8% at C1; Part 2 predictions 3, 5; Interpretation: contention signature, closed loop, utilization)

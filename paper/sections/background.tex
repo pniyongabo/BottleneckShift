@@ -1,0 +1,26 @@
+\section{Background}
+\label{sec:background}
+
+A request's life in vLLM has three phases: it waits in a \emph{queue}, its prompt is
+processed (\emph{prefill}), and its output is generated one token per engine step
+(\emph{decode}). Iteration-level scheduling admits and retires requests between steps
+\citep{yu2022orca}, and paged KV-cache management keeps memory for many concurrent
+requests \citep{kwon2023vllm}. With \emph{chunked prefill}, a long prompt is split
+across several steps and shares each step with the running decodes
+\citep{agrawal2024sarathiserve}. The \emph{token budget}
+(\texttt{max\_num\_batched\_tokens}) caps the tokens one step may process, decodes
+plus prompt chunks. vLLM's documentation describes the trade: smaller budgets give
+better inter-token latency, and larger ones better time to first token and throughput
+\citep{vllmdocsoptimization}. Our results refine this: at high concurrency, a larger
+budget improved median inter-token latency and worsened mean time to first token
+(Section~\ref{sec:budget}).
+
+We use the client-side metrics of vLLM's benchmark. TTFT is the time from sending a
+request to receiving its first token. Inter-token latency (ITL) is the gap between
+consecutive streamed tokens of one request. E2E is the total request latency. The
+\emph{share of latency before the first token} is $\sum \mathrm{TTFT} / \sum
+\mathrm{E2E}$ over a run's requests. We report ITL percentiles because averages hide
+jitter \citep{agrawal2024etalon}: a median and a 99th percentile can rank
+configurations differently, and tails matter at scale \citep{dean2013tail}. The
+benchmark pools the gaps of all requests in a run, and one engine step produces a gap
+for every request it carries, so a run's ITL p99 reflects its slowest few steps.
