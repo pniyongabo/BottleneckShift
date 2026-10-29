@@ -157,6 +157,14 @@ reason as at C32. Prediction 2's rank statistic also failed at C8 (Spearman 0.57
 against 0.7), although the large/small ratio held (9.0×), so the pre-registered rule
 rejects the step-size clause at C8.
 
+**Reanalysis: complete, October 28, 2026** ([report](../reports/reanalysis-20261028.md)).
+A post hoc reanalysis of the retained data, with no new collection. It confirms that the
+step interval tracks the previous step, recomputes step cost by execution time (large
+steps 6.6× to 29.6× small ones at C8), fits a four-term step-cost model that predicts
+C8 ITL p99 within 5% from one-request data, and adds repetition ranges, steady-state
+values (mean TTFT at C32 halves without each run's start-up burst), ITL clusters, and
+GPU clocks and power. Pre-registered verdicts are unchanged.
+
 These are the original planned stages, kept as later milestones. Milestone 3 takes a
 deliberately narrow slice of them: two workload regimes and one contention
 intervention. Each milestone below widens one factor into its own pre-registered

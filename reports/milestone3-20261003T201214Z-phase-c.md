@@ -2,6 +2,10 @@
 
 ## Result
 
+*Reanalysis note (2026-10-28): most of the rise in mean TTFT from C8 to C32 comes from
+each run's start-up burst, and the GPU clock was 3–4% lower under contention at C1; see
+the [reanalysis report](reanalysis-20261028.md), sections 6 and 8.*
+
 **Crossover probe:** the primary pre-registered prediction failed, in the opposite
 direction. Raising concurrency on `prefill_heavy` (2048 input / 32 output tokens) from
 C8 to C16 and C32 did not make pre-first-token time dominant. Its share of E2E latency

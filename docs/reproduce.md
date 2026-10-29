@@ -217,7 +217,8 @@ they do not measure per-step chunk sizes (see the [glossary](glossary.md)).
 The report's source is in `paper/` (LaTeX, one file per section under
 `paper/sections/`). Its figures are vector PDFs written by the same analysis scripts
 as the report figures, with `--format pdf` (`analysis/milestone3_figures.py`) or a
-`.pdf` path for `--figure` (`analysis/milestone5_steps.py`, `analysis/milestone5_part2.py`).
+`.pdf` path for `--figure` (`analysis/milestone5_part2.py`) or `--output`
+(`analysis/reanalysis_steps.py figure`).
 Build it with [Tectonic](https://tectonic-typesetting.github.io/):
 
 ```bash

@@ -53,6 +53,9 @@ step, which weakens the step-cost result above.
   L2048 at B2048) cannot reflect context, because both steps start at context 0. The
   gap follows the share of steps that carry prompt work (38% against 77%), as a lagged
   measure would. Part 2 tested context separately, with execution time.
+- **Reanalysis.** The [reanalysis report](reanalysis-20261028.md) confirms the lag in
+  Part 2's data and estimates each C32 step's own cost from the next step's interval
+  (pooled 9.9×, Spearman 0.92).
 
 ## Terms used in this report
 

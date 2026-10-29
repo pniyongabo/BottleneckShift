@@ -67,3 +67,7 @@ medians across the three repetitions, as each figure's legend states.
   8192 at C8 and C32: ITL p50 and p99 (log scale), mean TTFT, and output throughput.
   At C32, 512 flattens ITL but raises TTFT; 8192 lowers the median, raises the tail, and
   raises throughput.
+- **`reanalysis-step-timing.png`**: Milestone 5 Part 2's C8 steps (post hoc). Left: each
+  step's execution time against its scheduled tokens. Right: each step's schedule
+  interval against its own and the previous step's execution time; the interval tracks
+  the previous step. From `analysis/reanalysis_steps.py figure`.

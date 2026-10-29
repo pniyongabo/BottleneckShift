@@ -13,7 +13,7 @@ here uses public software, generated prompts, and independent experiments, with 
 proprietary code, data, or results.
 
 **Technical report:** [Where Does the Time Go? A Pre-Registered Study of Per-Step Cost
-in LLM Inference Serving](paper/bottleneckshift-report.pdf) (PDF, 9 pages plus
+in LLM Inference Serving](paper/bottleneckshift-report.pdf) (PDF, 9 pages including
 references; source in [`paper/`](paper/)).
 
 ## Why it matters
@@ -58,6 +58,9 @@ All on one GPU with a 0.5B model (Qwen2.5-0.5B-Instruct on an RTX A4000).
    step instead of making steps smaller. Its test of whether a step's cost tracks the
    tokens it schedules passed at 32 requests, but the step timing it used turned out to
    be confounded with the previous step, and the same test was rejected at 8 requests.
+   A post hoc [reanalysis](reports/reanalysis-20261028.md) with per-step execution time
+   supports the relation, and a simple step-cost model fit on one-request data predicts
+   ITL p99 at 8 requests within 5%.
    A second part timed each prompt chunk directly, one request at a time, and showed
    that a chunk's cost grows with its context, in line with a count of attention FLOPs:
    a 1024-token chunk took 19.5 ms at context 1024 and 36 ms at context 7168.
@@ -131,6 +134,7 @@ the most complete.
 | 3 | Workload regimes, concurrency crossover, GPU contention, token-budget intervention | Complete ([B](reports/milestone3-20261003T180358Z-phase-b.md), [C](reports/milestone3-20261003T201214Z-phase-c.md), [D](reports/milestone3-20261006T022744Z-phase-d.md)) |
 | 4 | Measurement-driven backend selection | Deferred: entry gate not met ([roadmap](experiments/roadmap.md)) |
 | 5 (pilot) | Prompt length versus token budget, with a per-step scheduler log | Complete: C32 block ([report](reports/milestone5-20261025T004640Z-pilot.md)); Part 2, the C8 block and a context-length test ([report](reports/milestone5p2-20261029T000043Z-part2.md)) |
+| Reanalysis | Post hoc: step timing, a step-cost model, uncertainty, steady state, clocks | Complete ([report](reports/reanalysis-20261028.md)) |
 | 5–9 | Full workload-shape study, network, host contention, GPU contention, crossed factors | Proposed |
 
 Proposed milestones have no data yet, and each needs its own pre-registered protocol

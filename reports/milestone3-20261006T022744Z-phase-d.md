@@ -2,6 +2,10 @@
 
 ## Result
 
+*Reanalysis note (2026-10-28): the jump in ITL p50 between C16 and C24 is the median
+crossing from a short-gap to a long-gap cluster while mean ITL rises steadily; see the
+[reanalysis report](reanalysis-20261028.md), section 7.*
+
 **The per-step transition reproduces and is located.** At vLLM's default token budget,
 median inter-token latency (ITL) stays near 5 ms up to 16 concurrent requests, then
 jumps to 46 ms at C24 and 56 ms at C32. Over the same range, output throughput plateaus

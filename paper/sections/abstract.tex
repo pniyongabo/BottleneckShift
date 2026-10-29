@@ -14,9 +14,10 @@ requests, a larger budget gives a 7\,ms median and 18\% more throughput but a
 169\,ms 99th percentile, and with the smallest budget queueing takes two thirds of
 each request's latency. Third, with one request at a time, a fixed-size prompt chunk
 costs up to 1.6$\times$ more at deeper context, in line with a count of attention
-FLOPs. A pre-registered test that a step's cost tracks its scheduled tokens was
-rejected at 8 concurrent requests, and its pass at 32 used a timing measure that we
-later found is confounded with the previous step.
+FLOPs, and a cost model fit on those data predicts the 99th-percentile inter-token
+latency at 8 concurrent requests within 5\% (post hoc). The pre-registered test that a
+step's cost tracks its scheduled tokens failed at 8 concurrent requests and passed at
+32 with a timing measure we later found lags by one step.
 
 Of 59 scored predictions, 40 held. We report the failures in full, including that
 measurement flaw. All GPU time for the study so far cost \$2.04.
