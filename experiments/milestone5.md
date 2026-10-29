@@ -321,4 +321,17 @@ series, 2,100 measured requests validated. See the
   scheduler packed two 1024-token prompts into one 2048-token step. Under the
   falsification rule, step size explains per-step cost, but H's account of the tail for
   prompts shorter than the budget is not supported.
-- The C8 block was not run, so predictions 8–10 are not scored.
+- The C8 block was not run in this session, so predictions 8–10 were not scored here;
+  they were scored in Part 2.
+
+**Part 2 completed October 29, 2026:** session `milestone5p2-20261029T000043Z`, eight
+series, 2,400 measured requests validated. See the [Part 2 report](../reports/milestone5p2-20261029T000043Z-part2.md).
+
+- Predictions 11, 12 (primary for Part 2), 13, and 14 were confirmed. A fixed-size
+  chunk's cost grows with its context (deepest/first 1.44× at B1024 and 1.62× at B2048;
+  Spearman 0.96), and a 2048-token chunk costs 1.67× a 1024-token chunk at context 0.
+- In the C8 block, predictions 1, 9, and 10 were confirmed. Prediction 8 was not: the
+  L1024 tail was only 11.2% lower, for the same packing reason as at C32. Prediction 2
+  was not confirmed on the C8 block: the large/small ratio held (9.0×), but the pooled
+  Spearman correlation was 0.57, against 0.7, so by the pre-registered rule H's first
+  clause is not supported at C8 by that statistic.
