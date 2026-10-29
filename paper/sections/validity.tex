@@ -1,0 +1,28 @@
+\section{Threats to validity}
+\label{sec:validity}
+
+\begin{itemize}
+  \item \emph{One setup.} All results come from one 0.5B model on one GPU type with
+    one vLLM version. A generation step at C1 took about 3.9\ms{} against a 2.2\ms{}
+    floor for reading the weights, so host-side and launch work is a large share of
+    each step. Larger models, other GPUs, and other serving systems could change the
+    results qualitatively as well as in scale.
+  \item \emph{Workload.} Closed-loop load bounds queues. Runs of 100 requests start
+    with a burst and end with a drain, which inflates mean TTFT at C32
+    (Section~\ref{sec:load}). Requests have identical lengths and start together, which
+    may favor packing. Prompts are random tokens, and repetitions replay the same
+    seed.
+  \item \emph{Few repetitions.} Results are medians of three repetitions, which agreed
+    within about 1\% for ITL and throughput in most cells; one C8 run had a p99 of
+    86\,ms against 120\,ms for the others. Bootstrap intervals over requests are
+    narrower than these ranges and understate run-to-run spread. Pooled step
+    statistics treat serially correlated steps as independent.
+  \item \emph{Timing and clocks.} Step timings are taken at vLLM's scheduler and
+    include host-side work; we did not check them against GPU-side timing. GPU clocks
+    were not locked: under load the GPU ran near its 140\,W limit, at 1440 to
+    1860\,MHz depending on condition and repetition.
+  \item \emph{Several machines.} Anchor series reproduced earlier results within about
+    1\% on different machines, so machine-to-machine differences were small where we
+    could check them.
+\end{itemize}
+% src: reports/reanalysis-20261028.md (sections 5, 6, 8); Limitations sections of the Phase C, Phase D, Milestone 5 pilot, and Part 2 reports; Phase B C1 TPOT 3.87 ms; reproduction values from Phase D prediction 5 and Milestone 5 predictions 6 and 10

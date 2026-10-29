@@ -211,3 +211,16 @@ iterations, but its token values credit a request's whole prompt at its first to
 they do not measure per-step chunk sizes (see the [glossary](glossary.md)).
 
 `scripts/gpu_contention.py` can also be run by hand during a disposable shakedown.
+
+## Build the technical report
+
+The report's source is in `paper/` (LaTeX, one file per section under
+`paper/sections/`). Its figures are vector PDFs written by the same analysis scripts
+as the report figures, with `--format pdf` (`analysis/milestone3_figures.py`) or a
+`.pdf` path for `--figure` (`analysis/milestone5_part2.py`) or `--output`
+(`analysis/reanalysis_steps.py figure`).
+Build it with [Tectonic](https://tectonic-typesetting.github.io/):
+
+```bash
+paper/build.sh      # writes paper/bottleneckshift-report.pdf
+```

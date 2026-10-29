@@ -1,0 +1,59 @@
+\section{The prediction ledger}
+\label{sec:ledger}
+
+Table~\ref{tab:ledger} counts every scored prediction by phase: of 59, 40 were
+confirmed, 4 mixed, 14 not confirmed, and 1 could not be tested. We group the misses by
+cause; the reports discuss each one, including those that fit no group, such as the
+order of TTFT across budgets.
+
+\begin{table}[t]
+  \centering
+  \caption{Scored predictions by phase. Phase B scores ten signatures for each of two
+    workload regimes. Milestone 5's C8 predictions are counted in Part~2. Split or
+    qualified verdicts (Phase D predictions 2 and 7) count as mixed.}
+  \label{tab:ledger}
+  \begin{tabular}{lrrrrr}
+    \toprule
+    Phase & Scored & Confirmed & Mixed & Not confirmed & Not testable \\
+    \midrule
+    B: workload regimes          & 20 & 14 & 0 & 5 & 1 \\
+    C: concurrency crossover     & 5  & 3  & 0 & 2 & 0 \\
+    C: GPU contention            & 7  & 4  & 2 & 1 & 0 \\
+    D: sweep and token budget    & 11 & 6  & 2 & 3 & 0 \\
+    Milestone 5, C32 block       & 7  & 6  & 0 & 1 & 0 \\
+    Milestone 5, Part 2          & 9  & 7  & 0 & 2 & 0 \\
+    \midrule
+    Total                        & 59 & 40 & 4 & 14 & 1 \\
+    \bottomrule
+  \end{tabular}
+  % src: ledger built from each report's prediction table; verdict words as stated in each report, except Phase D 2 ("met as specified, uninformative") and 7 ("not confirmed for p50; confirmed for p99"), counted as mixed
+\end{table}
+
+\paragraph{The hypothesis was wrong.}
+Prefill did not dominate the prefill-heavy workload, time before the first token did
+not dominate past saturation (Section~\ref{sec:load}), and short prompts were packed
+instead of making steps smaller (Section~\ref{sec:stepcost}).
+
+\paragraph{The instrument could not see the effect.}
+The iteration-token histogram could not show per-step chunk sizes, so Phase D's
+manipulation check failed as specified; that miss led to the step log, whose interval
+then turned out to lag by one step. \texttt{nvidia-smi} utilization is a busy fraction
+averaged over the driver's own sample period \citep{nvidiasmi}, so no polling rate
+could resolve 40\,ms prefills.
+
+\paragraph{The scheduler and the load generator shaped the result.}
+Queue growth past saturation was sub-linear (not confirmed), and contention raised
+queue time less than prefill time (mixed). Both fit a scheduler that serves running
+requests first and turns waiting into longer steps, and a closed-loop client that caps
+how many requests can wait.
+
+\paragraph{A test was too strict for its data.}
+The rank statistic of step size and interval cleared its threshold at C32 but not at
+C8. Forward and reverse condition orders differed by 0.1--2.5\% in latency and
+throughput, enough to fail a strict range-overlap test in Phase B. With three runs per
+order, two ranges fail to overlap by chance one time in ten for each metric, so across
+about ten metrics a few failures were expected.
+
+Two central results, the per-step crossover and the context measurements, were tested
+directly only because an earlier prediction failed or prompted a post hoc reading.
+% src: ledger section (lessons as stated in each report); Phase B stable-signature row; 2 x 3!3!/6! = 0.1

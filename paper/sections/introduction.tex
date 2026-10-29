@@ -1,0 +1,30 @@
+\section{Introduction}
+\label{sec:intro}
+
+LLM serving systems batch many requests through one model. Each engine step generates
+one token for every running request and may also process part of a new prompt
+\citep{yu2022orca,kwon2023vllm,agrawal2024sarathiserve}. Service targets are written in
+time to first token (TTFT) and time per output token \citep{zhong2024distserve}, so an
+operator who sees latency rise needs to know which phase grew. Past saturation the
+excess work is the same either way; the scheduler decides whether it shows up as
+waiting before the first token or as slower steps.
+
+We ask when the dominant source of client-visible delay changes, and which
+measurements can tell the causes apart, for one setup: vLLM serving
+Qwen2.5-0.5B-Instruct on one RTX A4000. Each experiment's predictions and thresholds
+were published before its data, each run was measured from three views, and every
+prediction was scored afterward. Our contributions are:
+\begin{itemize}
+  \item a pre-registered, three-view measurement method with a per-step scheduler log
+    (Section~\ref{sec:method});
+  \item where latency goes under load from C8 to C32, and why that shift is bounded
+    (Section~\ref{sec:load});
+  \item how the token budget trades median against tail latency
+    (Section~\ref{sec:budget});
+  \item what sets a step's cost: scheduled tokens and context, a FLOP count, and a
+    post hoc step-cost model (Section~\ref{sec:stepcost});
+  \item a ledger of all 59 scored predictions and what the misses taught us
+    (Section~\ref{sec:ledger}).
+\end{itemize}
+The code, configurations, protocols, and reports are public.\footnote{\url{https://github.com/pniyongabo/BottleneckShift}}
+% src: ledger counts (40 confirmed, 4 mixed, 14 not confirmed, 1 not testable)

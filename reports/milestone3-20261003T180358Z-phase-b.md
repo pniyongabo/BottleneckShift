@@ -208,7 +208,7 @@ Magnitudes are therefore not directly comparable; directions and mechanisms are.
 |---|---|---|
 | C8 gives ~6.5× throughput for a small TPOT/E2E cost (Milestones 1–2; `decode_heavy`) | **Supports** | Decode is memory-bound, and batching amortizes weight loading [1, 6, 7]. "Batching boosts decode phase throughput immensely but has little effect on prefill throughput" [4, §3.1]. Batching the token phase "yields high throughput without any downside" [6, §III-D]. Iteration-level scheduling is the basis of these gains [2]. |
 | TTFT rises with concurrency | **Supports** | Adding decodes to a batch increases TTFT, and TTFT includes a queueing term that grows with load [5, §1, §3.1]. Chunking prefills raises TTFT slightly, while batching long prefills with decodes without chunking causes generation stalls [4, §5.4.2]. |
-| Prefix caching lowered TTFT (Milestone 1 vs 2) | **Supports the direction** | Reusing a shared prefix removes redundant prefill and lowers first-token latency; higher hit rates give lower latency [1, §4.4; 8, §6.2–6.3]. Our comparison is confounded with sampling and warm-up changes, so only the direction is comparable. |
+| Prefix caching lowered TTFT (Milestone 1 vs 2) | **Supports the direction at C8 only** | Reusing a shared prefix removes redundant prefill and lowers first-token latency; higher hit rates give lower latency [1, §4.4; 8, §6.2–6.3]. Our comparison is confounded with sampling and warm-up changes, so only the direction is comparable. At C8, TTFT was 21–42% higher with caching off (Milestone 2). At C1 it was 13–16% lower with caching off, against the direction (correction, 2026-10-28). |
 | Decode dominates E2E even with 2048-token prompts | **Supports** | The generation phase is "responsible for most portion of the latency of a single request" [1, §2.2]. In [6, §III-C], a 1500-token prompt phase takes as long as about 6 output tokens. Here a 2048-token prefill (~40 ms) takes about as long as ~10 decode steps, the same order of magnitude on a much smaller model. |
 | `prefill_heavy` C8: TPOT 2.2×, ITL p99 10×, queueing, only 2.8× throughput | **Supports** | Prefills scheduled between decode iterations cause "generation stalls" and P99 time-between-tokens spikes [4, §3.1–3.2]. A waiting prompt can "substantially increase the tail for TBT" [6, §II-D]. Adding a prefill to a decode batch slows both, and chunking alleviates but does not eliminate this [5, §2.3; 3; 9]. The closest setup, vLLM with Qwen3-0.6B on one A100, reports the same interference: long prefills delay active decodes [11]. |
 | Strength of that interference on an RTX A4000 | **Qualifies** | Interference cost depends on memory bandwidth. On a 1.79 TB/s GPU it appears once decode tokens exceed 20% of a batch, versus 80% on a 4.8 TB/s H200 [12]. The A4000 has less bandwidth than either, so strong interference is plausible here. That is an inference, not tested in [12]. |
@@ -232,16 +232,16 @@ literature.
 6. P. Patel et al., "Splitwise: Efficient Generative LLM Inference Using Phase Splitting," ISCA 2024. https://arxiv.org/abs/2311.18677
 7. R. Pope et al., "Efficiently Scaling Transformer Inference," MLSys 2023. https://arxiv.org/abs/2211.05102
 8. L. Zheng et al., "SGLang: Efficient Execution of Structured Language Model Programs," NeurIPS 2024. https://arxiv.org/abs/2312.07104
-9. C. Hu et al., "Inference without Interference: Disaggregate LLM Inference for Mixed Downstream Workloads," arXiv 2401.11181, 2024. https://arxiv.org/abs/2401.11181
-10. P. G. Recasens et al., "Mind the Memory Gap: Unveiling GPU Bottlenecks in Large-Batch LLM Inference," arXiv 2503.08311, 2025. https://arxiv.org/abs/2503.08311
+9. C. Hu et al., "ShuffleInfer: Disaggregate LLM Inference for Mixed Downstream Workloads," ACM TACO 2025. Earlier version: "Inference without Interference: Disaggregate LLM Inference for Mixed Downstream Workloads," arXiv 2401.11181, 2024. https://arxiv.org/abs/2401.11181
+10. P. G. Recasens et al., "Mind the Memory Gap: Unveiling GPU Bottlenecks in Large-Batch LLM Inference," IEEE CLOUD 2025. https://arxiv.org/abs/2503.08311
 11. G. Agarwal et al., "Decode-Latency Feedback Prefill: A Model-Free Controller and Its Generalization Limits," arXiv 2609.38386, 2026. https://arxiv.org/abs/2609.38386
-12. W. Zhang et al., "Threshold-Based Exclusive Batching for LLM Inference," arXiv 2606.00516, 2026. https://arxiv.org/abs/2606.00516
-13. E. Chung et al., "Characterizing CPU-Induced Slowdowns in Multi-GPU LLM Inference," arXiv 2603.22774, 2026. https://arxiv.org/abs/2603.22774
+12. W. Zhang et al., "Threshold-Based Exclusive Batching for LLM Inference," ICML 2026. https://arxiv.org/abs/2606.00516
+13. E. Chung et al., "Characterizing CPU-Induced Slowdowns in Multi-GPU LLM Inference," IISWC 2026. https://arxiv.org/abs/2603.22774
 14. Z. Zhang et al., "TokTier: Exact Stateful CPU+GPU Tokenization for Agentic LLM Serving," arXiv 2607.29678, 2026. https://arxiv.org/abs/2607.29678
 15. A. Chandrasekar et al., "Identifying and Mitigating Systemic Measurement Bias in Production LLM Inference Benchmarks," arXiv 2605.24217, 2026. https://arxiv.org/abs/2605.24217
 
-Venues for references 3, 9, and 10–15 are not given. They are cited as arXiv
-preprints because no peer-reviewed venue was confirmed.
+References 3, 11, 14, and 15 are cited as arXiv preprints because no peer-reviewed
+venue was confirmed.
 
 ## Limitations
 

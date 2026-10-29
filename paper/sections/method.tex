@@ -1,0 +1,58 @@
+\section{Method}
+\label{sec:method}
+
+\paragraph{Setup.}
+All experiments used a rented NVIDIA RTX A4000 (16\,GB) with the NVIDIA 580-series
+driver and vLLM 0.29.0, serving Qwen2.5-0.5B-Instruct. Sessions ran on several rented
+virtual machines, each with its own physical GPU; Phase C reused Phase B's machine. The
+client was \texttt{vllm bench serve} on the same host, issuing a closed-loop workload:
+up to a fixed number of requests (the concurrency, C1 to C32) are kept in flight, and a
+new one is sent as soon as one finishes. Each run sends 100 requests (50 for the
+decode-heavy workload), so a run at C32 starts with a burst of 32 requests and ends as
+the last ones drain. Prompts are synthetic, with exact input and output lengths and a
+fixed seed.
+% src: configs/*.toml (num_prompts 100; 50 for decode-heavy); reports/milestone1-*.md (driver 580.178.04); reports/milestone2-*.md (different physical GPU); reports/milestone3-*-phase-c.md (same VM as Phase B); reports/milestone5p2-*-part2.md (Provenance)
+
+\paragraph{Controls.}
+Milestone 1 compared C1 with C8 in forward and reverse order, with three repetitions
+and 15-second cooldowns, and found 6.65$\times$ higher output throughput at C8. It ran
+with prefix caching on, an unpinned model revision, and the model's sampling defaults
+(temperature 0.7, top-p 0.8, top-k 20, repetition penalty 1.1), any of which could
+bias the result. Milestone 2 repeated it with prefix caching off, the server's model
+and tokenizer revisions pinned, greedy sampling with the model's generation defaults
+ignored (\texttt{--generation-config vllm}), and warm-ups at each concurrency. The
+effect held (about 6.5$\times$), and these controls apply to every later run.
+% src: reports/milestone1-20261001T205137Z.md (Result: 6.65x); reports/milestone2-20261003T034456Z.md (~6.5x); experiments/roadmap.md
+
+\paragraph{Pre-registration.}
+Each phase's protocol was merged into the public repository before its data were
+collected, and the merge time is the evidence. Milestones 1 and 2 stated expected
+signatures. From Milestone 3 on, protocols state predictions with thresholds and
+falsification rules, and each report scores every prediction as confirmed, mixed, or
+not confirmed (a few are qualified, such as ``not testable'') and labels
+interpretations made after seeing the data as post hoc. A final reanalysis of the
+retained data was not pre-registered, and its results are marked post hoc.
+
+\paragraph{Measurement.}
+From Milestone 3 on, each run is measured three ways: by the client (TTFT, ITL, E2E,
+and output throughput); by vLLM's Prometheus histograms of queue, prefill, and decode
+time per request, scraped before and after each run; and by \texttt{nvidia-smi} GPU
+utilization every 200\,ms and CPU utilization every second. vLLM's per-iteration token
+histogram credits a request's whole prompt to the step that emits its first token, so
+it cannot show how many prompt tokens a step processed. For Milestone 5 we therefore
+added an opt-in vLLM plugin that logs each engine step's scheduled tokens, split into
+prefill and decode, and its requests. Part~2 added each prefill chunk's context
+position and the time the step's results returned. From these we compute a step's
+\emph{execution time}: from when it could start (it was scheduled and the previous
+step's results had arrived) until its own results arrived. We did not record which of
+vLLM's scheduling modes was active.
+% src: reports/milestone3-*-phase-d.md (iteration histogram); experiments/milestone5.md (Instrument; Part 2 addendum)
+
+\paragraph{Validation.}
+Before analysis, a validator checks each series for zero failures and exact token
+lengths, server request counts that match the prompts sent, warm-ups, telemetry
+coverage (gaps of up to 1\,s for GPU and 3\,s for CPU samples), and, for Milestone 5,
+step-log coverage of every run. Raw results are archived with a SHA-256 checksum,
+verified after transfer, before the machine is deleted. The study comprises 18{,}900
+measured requests.
+% src: measured-request counts from each report's Validation table: M1 1,200; M2 1,200; B 1,800; C 4,800; D 5,400; M5 pilot 2,100; M5 Part 2 2,400

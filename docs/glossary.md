@@ -75,7 +75,7 @@ scrapes taken before and after the run.
 |---|---|
 | **Prefix caching** | vLLM reusing stored work for repeated prompt prefixes. It is turned off from Milestone 2 onward, so repetitions cannot share cached work. |
 | **`generation_config = "vllm"`** | Ignore the model's own default sampling settings, such as repetition penalty and top-k, so that only the explicit settings apply. |
-| **Greedy decoding** | `temperature = 0`: always pick the most likely next token, so outputs are deterministic. |
+| **Greedy decoding** | `temperature = 0`: always pick the most likely next token. Text is identical across C1 repetitions, but it can change with batching: at C8, 21 to 27 of 100 prompts produced different text (Milestone 2). |
 | **Pinned revision** | A fixed Hugging Face commit for the model and tokenizer (`7ae5576…`), instead of the moving `main`. |
 
 ## GPU contention (Milestone 3 Phase C)

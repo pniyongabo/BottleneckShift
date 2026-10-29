@@ -1,0 +1,22 @@
+\section{Conclusion and future work}
+\label{sec:conclusion}
+
+On this setup, from C16 to C32 at the default budget, added delay went into per-step
+time while steps filled toward the budget's cap; with the smallest budget it went into
+the queue. The budget decides how prompt work is cut into steps and so trades median
+against tail latency, and concurrency decides how many steps carry prompt work. A
+step's cost follows its tokens and their context closely enough that a four-term model
+fit on one-request data predicts the C8 tail, but that result is post hoc, and the
+pre-registered test of the token-count relation failed at C8. Four directions follow:
+\begin{itemize}
+  \item a pre-registered test of the step-cost model in the style of Vidur
+    \citep{agrawal2024vidur}: predict ITL p50 and p99 at C32 and other budgets before
+    measuring them, and identify the decode term with multi-request data;
+  \item open-loop load with varied lengths, to see whether the per-step account and
+    packing hold when queues can grow and requests do not arrive in groups;
+  \item larger models and multi-GPU serving, where communication adds a third
+    component to step cost;
+  \item measurement-driven backend selection, which we deferred because single-server
+    data cannot evaluate a selection policy without invented rewards.
+\end{itemize}
+% src: experiments/roadmap.md (Milestone 4 deferral); report next-step sections

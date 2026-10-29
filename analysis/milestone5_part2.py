@@ -102,7 +102,7 @@ def context_figure(summaries: list[dict], output: Path) -> None:
              title="Prefill chunk cost by context, one request at a time")
     axis.legend(fontsize=8)
     fig.tight_layout()
-    fig.savefig(output, dpi=150)
+    fig.savefig(output, dpi=150, **({"metadata": {"CreationDate": None}} if output.suffix == ".pdf" else {}))
 
 
 def main() -> int:

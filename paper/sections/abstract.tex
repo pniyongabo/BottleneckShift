@@ -1,0 +1,25 @@
+\begin{abstract}
+When an LLM inference server slows down under load, it is often unclear where the time
+goes. We measured vLLM serving a 0.5B-parameter model on one GPU in a series of
+pre-registered experiments totaling 18{,}900 measured requests. Most runs were
+observed from the client, the server's phase metrics, and GPU and CPU telemetry, and
+the last experiments added a per-step scheduler log. Every prediction was published
+before its data and scored after.
+
+First, from 8 to 32 concurrent requests, past throughput saturation, the added latency
+moves into each generation step: the share of latency before the first token falls
+from 0.44 to 0.24 while median inter-token latency rises from 4.9 to 55\,ms. Second,
+the scheduler's token budget decides where that delay appears. At 32 concurrent
+requests, a larger budget gives a 7\,ms median and 18\% more throughput but a
+169\,ms 99th percentile, and with the smallest budget queueing takes two thirds of
+each request's latency. Third, with one request at a time, a fixed-size prompt chunk
+costs up to 1.6$\times$ more at deeper context, in line with a count of attention
+FLOPs, and a cost model fit on those data predicts the 99th-percentile inter-token
+latency at 8 concurrent requests within 5\% (post hoc). The pre-registered test that a
+step's cost tracks its scheduled tokens failed at 8 concurrent requests and passed at
+32 with a timing measure we later found lags by one step.
+
+Of 59 scored predictions, 40 held. We report the failures in full, including that
+measurement flaw. All GPU time for the study so far cost \$2.04.
+\end{abstract}
+% src: counts from the ledger (reports/*); 18,900 = sum of each report's measured requests; numbers from Phase C, Phase D (budget-0512 C32: queue 1222.3 of mean E2E 1843.9 ms), and Milestone 5 reports
