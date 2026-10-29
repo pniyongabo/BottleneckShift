@@ -1,24 +1,18 @@
 \section{Related work}
 \label{sec:related}
 
-Orca introduced iteration-level scheduling \citep{yu2022orca}, and vLLM added paged
-KV-cache management \citep{kwon2023vllm}. Sarathi and Sarathi-Serve introduced chunked
-prefill and the per-step token budget, showed that long prefills stall co-scheduled
-decodes, and noted that each chunk must read the KV cache of the chunks before it
-\citep{agrawal2023sarathi,agrawal2024sarathiserve}; we measure the budget's trade and
-the per-chunk cost of context directly in vLLM. Vidur predicts iteration time from
-profiled operator costs, modeling prefill attention by prompt length and decode
+Sarathi-Serve introduced chunked prefill with a per-step token budget, showed that
+long prefills stall co-scheduled decodes, and noted that each chunk must read the KV
+cache of the chunks before it \citep{agrawal2024sarathiserve}; we measure the budget's
+trade and the per-chunk cost of context directly in vLLM. Vidur predicts iteration time
+from profiled operator costs, modeling prefill attention by prompt length and decode
 attention by KV-cache reads \citep{agrawal2024vidur}; our per-chunk measurements are
-the kind of data such a model needs for chunked prefill. DistServe and Splitwise run
-prefill and decode on separate GPUs to avoid this interference
-\citep{zhong2024distserve,patel2024splitwise}; we study it within one engine. Etalon
-argues that averaged metrics such as time per output token hide jitter
-\citep{agrawal2024etalon}, and our median-versus-tail results are an instance. We
-follow Hoefler and Belli's rules for performance measurement
+the kind of data such a model needs for chunked prefill. DistServe runs prefill and
+decode on separate GPUs to avoid their interference \citep{zhong2024distserve}; we
+study it within one engine. Etalon argues that averaged metrics such as TPOT hide
+jitter \citep{agrawal2024etalon}, and our median-versus-tail results are an instance.
+We follow Hoefler and Belli's rules for performance measurement
 \citep{hoefler2015scientific} in repeating runs, alternating run orders where the
 design allowed, and reporting every result, but report no confidence intervals.
 Schroeder et al.\ show how closed-loop load generators hide queueing
 \citep{schroeder2006open}, which matches our contention and saturation results.
-Interference from co-located GPU work is well documented \citep{zhao2025tally}, as is
-the weakness of \texttt{nvidia-smi} utilization as a measure of GPU load
-\citep{nvidiasmi,baviskar2025gpuutil,frye2025gpuutil}.

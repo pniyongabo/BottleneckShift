@@ -7,7 +7,7 @@ the last experiments added a per-step scheduler log. Every prediction was publis
 before its data and scored after.
 
 First, from 8 to 32 concurrent requests, past throughput saturation, the added latency
-moves into each generation step: the share of latency before the first token falls
+moves into each engine step: the share of latency before the first token falls
 from 0.44 to 0.24 while median inter-token latency rises from 4.9 to 55\,ms. Second,
 the scheduler's token budget decides where that delay appears. At 32 concurrent
 requests, a larger budget gives a 7\,ms median and 18\% more throughput but a

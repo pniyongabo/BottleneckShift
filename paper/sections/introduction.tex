@@ -2,16 +2,15 @@
 \label{sec:intro}
 
 LLM serving systems batch many requests through one model. Each engine step generates
-one token for every running request and may also process part of a new prompt
-\citep{yu2022orca,kwon2023vllm,agrawal2024sarathiserve}. Service targets are written in
-time to first token (TTFT) and time per output token \citep{zhong2024distserve}, so an
-operator who sees latency rise needs to know which phase grew. Past saturation the
+one token for every running request and may also process part of a new prompt.
+Service targets are written in time to first token (TTFT) and time per output token
+(TPOT), so an operator who sees latency rise needs to know which phase grew. Past saturation the
 excess work is the same either way; the scheduler decides whether it shows up as
 waiting before the first token or as slower steps.
 
 We ask when the dominant source of client-visible delay changes, and which
-measurements can tell the causes apart, for one setup: vLLM serving
-Qwen2.5-0.5B-Instruct on one RTX A4000. Each experiment's predictions and thresholds
+measurements can tell the causes apart, for one setup: vLLM \citep{kwon2023vllm}
+serving Qwen2.5-0.5B-Instruct on one RTX A4000. Each experiment's predictions and thresholds
 were published before its data, each run was measured from three views, and every
 prediction was scored afterward. Our contributions are:
 \begin{itemize}

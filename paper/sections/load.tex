@@ -5,18 +5,17 @@
 We first compared a prefill-heavy workload (2048 input and 32 output tokens) with a
 decode-heavy one (64 and 512) at C1 and C8. We had predicted that time before the first
 token would dominate the prefill-heavy workload, but a request running alone spent
-about 40\ms{} in prefill and about 122\ms{} in its 31 generation steps. A cost estimate
+about 40\ms{} in prefill and about 122\ms{} in its 31 decode steps. A cost estimate
 predicts this \citep{pope2023scaling}. Prefill of 2048 tokens needs about 1.6 TFLOP
 (two FLOPs per weight per token, plus attention), or 21\ms{} at the A4000's dense
-16-bit tensor peak of 77 TFLOPS. Each generation step must read about 1\,GB of
-weights, at least 2.2\ms{} at 448\,GB/s, or 68\ms{} for 31 steps
+16-bit tensor peak of 77 TFLOPS. Each decode step must read about 1\,GB of weights, at least 2.2\ms{} at 448\,GB/s, or 68\ms{} for 31 steps
 \citep{nvidiaa4000}. Even at these ideal rates prefill is about a quarter of the
 request, so the prediction could have been made in advance.
 
 From C1 to C8 the share of latency before the first token rose from 31\% to 45\%. (At
 C1 the client's 54\ms{} TTFT includes about 14\ms{} of request handling outside the
 server's prefill time.) The decode-heavy workload gained 6.46$\times$ throughput for
-10\% slower per-token time; the prefill-heavy one gained only 2.8$\times$, with
+10\% higher TPOT; the prefill-heavy one gained only 2.8$\times$, with
 queueing and a tenfold rise in ITL p99. At C8 much of a request's decode time is spent
 in steps that also carry other requests' prompt chunks, so a per-request phase
 breakdown books GPU prefill work as decode time. In Milestone 5's step log, 23\% of C8
@@ -48,7 +47,7 @@ steadily: 8.7, 13.3, 18.0, 30.5, and 45.1\ms{} from C8 to C32 (post hoc).
 
 \paragraph{The shift is bounded.}
 At $B{=}2048$ a step costs at most about 56\ms{} (ITL p99 was 58\ms{} at C32), so a
-request's 31 generation steps take at most about 1.8\,s. Past saturation throughput no
+request's 31 decode steps take at most about 1.8\,s. Past saturation throughput no
 longer grows, so by Little's law each added request in flight adds latency, and once
 steps are full it must go into the wait for the first token. Over full runs, mean TTFT
 doubled from C8 (215\ms) to C32 (431\ms), but most of that comes from the burst of
