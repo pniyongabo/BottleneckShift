@@ -28,6 +28,7 @@ def test_spearman_is_one_for_monotone_data_and_handles_ties():
     assert steps_module.spearman([1, 2, 3, 4], [10, 40, 90, 160]) == pytest.approx(1.0)
     assert steps_module.spearman([1, 2, 3, 4], [4, 3, 2, 1]) == pytest.approx(-1.0)
     assert -1 <= steps_module.spearman([1, 1, 2, 2], [1, 2, 1, 2]) <= 1
+    assert steps_module.spearman([1, 1, 1], [1, 2, 3]) != steps_module.spearman([1, 1, 1], [1, 2, 3])  # NaN
 
 
 def test_pooled_ratio_uses_large_and_small_step_medians():

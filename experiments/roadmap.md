@@ -146,10 +146,14 @@ the scale of the ITL tail (B8192 about 3× B2048). The primary tail prediction f
 its L1024 part: the scheduler packed two 1024-token prompts into one 2048-token step.
 Seven of eight C32 predictions held; the optional C8 block was not run.
 
-**Milestone 5 Part 2: pre-registered October 26, 2026** (addendum in the
-[protocol](milestone5.md)). It runs the C8 block and a context-length test: one request
-at a time with 8192-token prompts at budgets 1024 and 2048, so each prefill chunk has a
-fixed size at a known context position. The step log adds executor-side timing.
+**Milestone 5 Part 2: complete, October 29, 2026** (addendum in the
+[protocol](milestone5.md), [report](../reports/milestone5p2-20261029T000043Z-part2.md)). The context-length test (C1, 8192-token
+prompts, budgets 1024 and 2048) confirmed that a fixed-size chunk's cost grows with its
+context: the deepest chunks cost 1.44× and 1.62× the first, with a Spearman correlation
+of 0.96. In the C8 block, concurrency moved the median as predicted (about 5 ms at C8
+against 55 ms at C32 for B2048), but the tail prediction failed for the same packing
+reason as at C32. Prediction 2's rank statistic also failed at C8 (Spearman 0.57,
+against 0.7), although the large/small ratio held (9.0×).
 
 These are the original planned stages, kept as later milestones. Milestone 3 takes a
 deliberately narrow slice of them: two workload regimes and one contention

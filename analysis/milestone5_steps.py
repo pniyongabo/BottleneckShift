@@ -80,7 +80,7 @@ def spearman(xs: list[float], ys: list[float]) -> float:
     mx, my = statistics.fmean(rx), statistics.fmean(ry)
     covariance = sum((a - mx) * (b - my) for a, b in zip(rx, ry))
     spread = (sum((a - mx) ** 2 for a in rx) * sum((b - my) ** 2 for b in ry)) ** 0.5
-    return covariance / spread
+    return covariance / spread if spread else float("nan")  # undefined when all values tie
 
 
 def median_or_none(values: list[float]) -> float | None:

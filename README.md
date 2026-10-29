@@ -51,10 +51,12 @@ All on one GPU with a 0.5B model (Qwen2.5-0.5B-Instruct on an RTX A4000).
    the tokens it schedules (about 6 ms for a decode-only step, 55 ms for a full
    2048-token step) and that the budget sets the scale of the tail. Its primary tail
    prediction failed in one part: short prompts were packed two per step instead of
-   making steps smaller.
+   making steps smaller. A second part showed that a chunk's cost also grows with its
+   context: a 1024-token chunk took 19.5 ms at context 1024 and 36 ms at context 7168.
    ([Phase C](reports/milestone3-20261003T201214Z-phase-c.md),
    [Phase D](reports/milestone3-20261006T022744Z-phase-d.md),
-   [Milestone 5 pilot](reports/milestone5-20261025T004640Z-pilot.md))
+   [Milestone 5 pilot](reports/milestone5-20261025T004640Z-pilot.md),
+   [Part 2](reports/milestone5p2-20261029T000043Z-part2.md))
 3. **Under closed-loop load, GPU contention looks different from added load.** A
    co-located process at a 50% duty cycle costs 13–15% end-to-end latency. It slows
    single requests too and, with one request at a time, slows prefill more than decode,
@@ -119,7 +121,7 @@ the most complete.
 | 1–2 | Concurrency effect, then repeated under explicit cache, sampling, and model controls | Complete ([1](reports/milestone1-20261001T205137Z.md), [2](reports/milestone2-20261003T034456Z.md)) |
 | 3 | Workload regimes, concurrency crossover, GPU contention, token-budget intervention | Complete ([B](reports/milestone3-20261003T180358Z-phase-b.md), [C](reports/milestone3-20261003T201214Z-phase-c.md), [D](reports/milestone3-20261006T022744Z-phase-d.md)) |
 | 4 | Measurement-driven backend selection | Deferred: entry gate not met ([roadmap](experiments/roadmap.md)) |
-| 5 (pilot) | Prompt length versus token budget, with a per-step scheduler log | C32 block complete ([report](reports/milestone5-20261025T004640Z-pilot.md)); Part 2 (C8 block and a context-length test) pre-registered ([addendum](experiments/milestone5.md)) |
+| 5 (pilot) | Prompt length versus token budget, with a per-step scheduler log | Complete: C32 block ([report](reports/milestone5-20261025T004640Z-pilot.md)); Part 2, the C8 block and a context-length test ([report](reports/milestone5p2-20261029T000043Z-part2.md)) |
 | 5–9 | Full workload-shape study, network, host contention, GPU contention, crossed factors | Proposed |
 
 Proposed milestones have no data yet, and each needs its own pre-registered protocol

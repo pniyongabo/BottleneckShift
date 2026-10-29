@@ -43,6 +43,9 @@ scrapes taken before and after the run.
 | **Step log** (*server*, Milestone 5) | `steps.jsonl`, written by the opt-in vLLM plugin `src/bottleneckshift/vllm_steplog.py`: one line per engine step that schedules tokens, with its total scheduled tokens, how many were prompt (prefill) tokens, the number of scheduled requests, and the wall-clock time around scheduling. Unlike the iteration-token histogram, it records per-step chunk sizes. |
 | **Step interval** (*custom*, Milestone 5) | Time from one logged step's start to the next step's start within a run; the run's last step and gaps over 1 s are dropped. It includes output processing, and may partly reflect the previous step (Milestone 5 report). |
 | **Large / small step** (*custom*, Milestone 5) | A step scheduling at least 1024 / at most 64 tokens. |
+| **Context position** (Milestone 5 Part 2) | For a prefill chunk, the number of the prompt's tokens already computed before it. |
+| **Full chunk** (Milestone 5 Part 2) | A step with exactly one prefill chunk of exactly B tokens (B is the token budget). |
+| **Execution time** (*custom*, Milestone 5 Part 2) | t_output[n] − max(t_end[n], t_output[n − 1]): from when a step could start (it was scheduled and the previous step's results had arrived) until its own results arrived. Unlike the step interval, it is matched to the step itself even when vLLM schedules the next step early. |
 
 ## Load and experimental design
 
