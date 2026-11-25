@@ -2,14 +2,15 @@
 \label{sec:background}
 
 \paragraph{Phases and steps.}
-vLLM runs in \emph{engine steps}: each step, the scheduler picks the tokens to process
-and the model runs one forward pass over them. A request waits in a \emph{queue}; its
-\emph{prefill} then processes the prompt and produces the first output token, and its
-\emph{decode} produces each remaining token, one per step. With chunked prefill
-\citep{agrawal2024sarathiserve}, a long prompt is split across steps, so one step can
-carry both decode tokens and prompt chunks. vLLM 0.29.0 enables asynchronous
-scheduling by default in our configuration: it schedules step $n{+}1$ before it
-processes step $n$'s results.
+vLLM runs in \emph{engine steps}, or scheduler iterations: each step, the scheduler
+picks the tokens to process and the model runs one forward pass over them. A step's
+\emph{cost} is the time it takes to execute, from when it can start until its results
+arrive. A request waits in a \emph{queue}; its \emph{prefill} then processes the
+prompt and produces the first output token, and its \emph{decode} produces each
+remaining token, one per step. With chunked prefill \citep{agrawal2024sarathiserve}, a
+long prompt is split across steps, so one step can carry both decode tokens and prompt
+chunks. vLLM 0.29.0 enables asynchronous scheduling by default in our configuration:
+it schedules step $n{+}1$ before it processes step $n$'s results.
 % src: vLLM v0.29.0 source: config/vllm.py (async_scheduling defaults to True for a generative model without speculative decoding on the uniproc executor), max_concurrent_batches = 2, v1/engine/core.py step_with_batch_queue
 
 \paragraph{Token budget.}

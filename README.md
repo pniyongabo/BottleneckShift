@@ -12,9 +12,19 @@ timings, and from GPU/CPU telemetry. The goal is experimental diagnosis. Everyth
 here uses public software, generated prompts, and independent experiments, with no
 proprietary code, data, or results.
 
-**Technical report:** [Where Does the Time Go? A Pre-Registered Study of Per-Step Cost
-in LLM Inference Serving](paper/bottleneckshift-report.pdf) (PDF, 9 pages including
+**Technical report:** [Where Does the Inference Time Go? Queueing, Prefill, and Per-Step
+Cost in LLM Serving](paper/bottleneckshift-report.pdf) (PDF, 9 pages including
 references; source in [`paper/`](paper/)).
+
+## What we learned
+
+- Under load, latency depends on how the scheduler splits prompt work into engine
+  steps (scheduler iterations) and on how long each step takes, as well as on
+  concurrency.
+- The token budget trades median against tail: at 32 requests, the budget with the
+  best median ITL (7 ms) had the worst p99 (169 ms), so a median alone can mislead.
+- Client and GPU metrics show the added latency, and a per-step scheduler log
+  traces it to steps that carry prompt work.
 
 ## Why it matters
 
@@ -35,11 +45,11 @@ a request dominates, and when that changes, decides what to tune:
 - **Shared GPUs.** A co-located job slows inference in ways that GPU utilization barely
   shows (finding 5).
 
-## Findings so far
+## Findings
 
 All on one RTX A4000 with vLLM 0.29.0 serving Qwen2.5-0.5B-Instruct. Inter-token
 latency (ITL) is the gap between consecutive streamed outputs of a request; the token
-budget is vLLM's `max_num_batched_tokens`, the most tokens one engine step may process.
+budget is vLLM's `max_num_batched_tokens`, the most tokens one engine step (one scheduler iteration) may process.
 
 1. **Decode dominates each request, even with long prompts.** With 2048-token prompts
    and 32-token outputs, a request running alone spends about 40 ms in prefill and
