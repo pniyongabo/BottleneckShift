@@ -1,12 +1,18 @@
 \section{Conclusion and future work}
 \label{sec:conclusion}
 
+The scheduler shapes request latency by deciding how prompt work is spread across
+engine steps. The token budget trades median against tail latency, so a median alone
+can mislead. A step's cost depends on how many tokens it schedules and how deep in the
+context they sit. Per-step measurements locate delay that client and GPU metrics show
+only in total. Under asynchronous scheduling, though, a step's measured interval
+reflects the previous step's cost, so a latency model has to account for when steps
+are scheduled as well as how long they run.
+
 On this setup, from C16 to C32 at the default budget, added delay went into per-step
 time while steps filled toward the budget's cap; with the smallest budget it went into
-the queue. The budget decides how prompt work is cut into steps and so trades median
-against tail latency, and concurrency decides how many steps carry prompt work. A
-step's cost follows its tokens and their context closely enough that a four-term model
-fit on one-request data predicts the C8 tail, but that result is post hoc, and the
+the queue. Concurrency decides how many steps carry prompt work. A four-term model fit
+on one-request data predicts the C8 tail, but that result is post hoc, and the
 pre-registered test of the token-count relation failed at C8. Four directions follow:
 \begin{itemize}
   \item a pre-registered test of the step-cost model in the style of Vidur
