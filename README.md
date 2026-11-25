@@ -7,10 +7,9 @@
 > shifts?
 
 BottleneckShift runs controlled experiments on [vLLM](https://github.com/vllm-project/vllm)
-and measures every run three ways: from the client, from the server's own phase
-timings, and from GPU/CPU telemetry. The goal is experimental diagnosis. Everything
-here uses public software, generated prompts, and independent experiments, with no
-proprietary code, data, or results.
+and measures every run from the client, the server's phase timings, and GPU/CPU
+telemetry. It uses only public software and generated prompts, with no proprietary
+code, data, or results.
 
 **Technical report:** [Where Does the Inference Time Go? Queueing, Prefill, and Per-Step
 Cost in LLM Serving](paper/bottleneckshift-report.pdf) (PDF, 9 pages including
@@ -26,132 +25,63 @@ references; source in [`paper/`](paper/)).
 - Client and GPU metrics show the added latency, and a per-step scheduler log
   traces it to steps that carry prompt work.
 
-## Why it matters
-
-Serving systems are tuned for different goals. DistServe, for example, sets separate
-time-to-first-token (TTFT) and time-per-output-token (TPOT) targets for chatbot,
-code-completion, and summarization services [[2]](#related-work). Knowing which phase of
-a request dominates, and when that changes, decides what to tune:
-
-- **Interactive chat and coding assistants.** Users feel both the wait for the first
-  token and how smoothly tokens stream. Under load, the delay moves into per-step time,
-  and the scheduler's token budget shifts that cost between median and tail latency
-  (findings 2 and 3).
-- **Long-prompt workloads such as retrieval-augmented generation.** A workload that
-  looks prefill-heavy can still be dominated by decode (finding 1).
-- **Capacity planning and autoscaling.** Throughput at high concurrency depends on the
-  token budget: at 32 requests, raising it from the default 2048 to 8192 gave 18% more
-  throughput (finding 3).
-- **Shared GPUs.** A co-located job slows inference in ways that GPU utilization barely
-  shows (finding 5).
+Which phase dominates decides what to tune: the wait for the first token, or the
+per-step time that sets how smoothly tokens stream.
 
 ## Findings
 
 All on one RTX A4000 with vLLM 0.29.0 serving Qwen2.5-0.5B-Instruct. Inter-token
 latency (ITL) is the gap between consecutive streamed outputs of a request; the token
-budget is vLLM's `max_num_batched_tokens`, the most tokens one engine step (one scheduler iteration) may process.
+budget is vLLM's `max_num_batched_tokens`, the most tokens one engine step may process.
 
 1. **Decode dominates each request, even with long prompts.** With 2048-token prompts
-   and 32-token outputs, a request running alone spends about 40 ms in prefill and
-   about 122 ms in its 31 decode steps, as a FLOP and memory-bandwidth estimate
-   predicts. At 8 concurrent requests, much of a request's decode time is spent in
-   steps that also carry other requests' prompt chunks.
+   and 32-token outputs, a lone request spends about 40 ms in prefill and 122 ms in
+   decode, as a FLOP and bandwidth estimate predicts.
    ([Phase B](reports/milestone3-20261003T180358Z-phase-b.md))
-2. **From 8 to 32 concurrent requests, past saturation, added latency moves into
-   per-step time.** Median ITL rises from 4.9 to 55 ms, while the share of latency
-   before the first token falls from 0.44 to 0.24, against the pre-registered
-   prediction. The shift is bounded: once every step is full, further load must go
-   into the wait for the first token.
+2. **Past saturation, added latency moves into per-step time.** From 8 to 32
+   requests, median ITL rises from 4.9 to 55 ms and the share of latency before the
+   first token falls from 0.44 to 0.24, against the pre-registered prediction.
    ([Phase C](reports/milestone3-20261003T201214Z-phase-c.md),
    [Phase D](reports/milestone3-20261006T022744Z-phase-d.md))
 3. **The token budget trades median against tail.** At 32 requests, 8192 tokens gives
    a 7 ms median ITL and 18% more throughput but a 169 ms p99; 512 evens out ITL but
-   triples TTFT, and queueing takes two thirds of each request's latency. The budget
-   sets the scale of the tail. Short prompts were packed two per step instead of
-   making steps smaller, which failed part of the pre-registered tail prediction.
+   triples TTFT. Part of the pre-registered tail prediction failed.
    ([Phase D](reports/milestone3-20261006T022744Z-phase-d.md),
    [Milestone 5 pilot](reports/milestone5-20261025T004640Z-pilot.md),
    [Part 2](reports/milestone5p2-20261029T000043Z-part2.md))
-4. **A step's cost grows with its tokens and their context.** Timed one request at a
-   time, a 1024-token prompt chunk took 19.5 ms at context 1024 and 36 ms at context
-   7168, in line with a count of attention FLOPs. The pre-registered test that a
-   step's cost tracks its scheduled tokens was rejected at 8 requests, and its pass at
-   32 used a step interval that, under vLLM's asynchronous scheduling, lags by one
-   step. A post hoc [reanalysis](reports/reanalysis-20261028.md) with
-   per-step execution time supports the relation, and a four-term step-cost model fit
-   on one-request data predicts ITL p99 at 8 requests within 5%.
-   ([Part 2](reports/milestone5p2-20261029T000043Z-part2.md))
+4. **A step's cost grows with its tokens and their context.** A 1024-token chunk took
+   19.5 ms at context 1024 and 36 ms at 7168. The pre-registered token-count test
+   failed at 8 requests, and its pass at 32 used a timing measure that lags by one
+   step. A post hoc step-cost model predicts ITL p99 at 8 requests within 5%.
+   ([Part 2](reports/milestone5p2-20261029T000043Z-part2.md),
+   [reanalysis](reports/reanalysis-20261028.md))
 5. **Under closed-loop load, GPU contention looks different from added load.** A
-   co-located process at a 50% duty cycle costs 13–15% end-to-end latency. It slows
-   single requests too and, with one request at a time, slows prefill more than
-   decode, while `nvidia-smi` utilization, already near 90%, moves only 1–6 points. At
-   8 requests, queue time rose only 6%, against the pre-registered prediction that it
-   would rise more than prefill.
+   co-located job at a 50% duty cycle costs 13–15% end-to-end latency, while
+   `nvidia-smi` utilization, already near 90%, moves only 1–6 points. At 8 requests,
+   queue time rose only 6%, against the pre-registered prediction.
    ([Phase C](reports/milestone3-20261003T201214Z-phase-c.md))
 
 ![Phase C crossover: throughput, inter-token latency, and pre-first-token share against concurrency](reports/figures/milestone3-phase-c-crossover.png)
 
 ![Phase D token budget: inter-token latency, TTFT, and throughput per budget](reports/figures/milestone3-phase-d-budget.png)
 
-More figures, including the contention series: [`reports/figures/`](reports/figures/README.md).
+More figures: [`reports/figures/`](reports/figures/README.md). Related work is in
+Section 11 of the [technical report](paper/bottleneckshift-report.pdf).
 
 ## Method
 
-- **Pre-registration.** Each protocol is merged before its data are collected
-  ([`experiments/`](experiments/roadmap.md)), and every report scores every prediction,
-  including the ones that failed. Milestones 1 and 2 state expected signatures;
-  numbered predictions and falsification criteria start with Milestone 3.
-- **One factor at a time,** with three repetitions, in forward and reverse order where
-  the design allows. From
-  Milestone 2 onward, runs use a pinned model revision, prefix caching off, and
-  explicit sampling.
-- **Three views of every run from Milestone 3 onward:** client request timings, vLLM's
-  server-side `/metrics` histograms (queue, prefill, decode), and GPU/CPU telemetry.
-- **Validation before analysis.** Request counts, failures, token lengths, server
-  counts, and telemetry coverage are checked, and analysis refuses an unvalidated
-  series. Raw data are archived with checksums.
-- **Controls for interventions (from Milestone 3 Phase C):** a sham condition and a
+- Each protocol is merged before its data are collected
+  ([`experiments/`](experiments/roadmap.md)), and every report scores every
+  prediction, including the failures.
+- Factors change one at a time, with three repetitions.
+- Series are validated before analysis, and interventions get a sham condition and a
   recovery baseline.
 
-## Related work
+## Status
 
-1. Kwon et al., [vLLM / PagedAttention](https://arxiv.org/abs/2309.06180), SOSP 2023:
-   the serving system under study.
-2. Zhong et al., [DistServe](https://arxiv.org/abs/2401.09670), OSDI 2024: prefill and
-   decode interfere, and services set different TTFT and TPOT targets. This study
-   measures that interference within one engine.
-3. Agrawal et al., [Sarathi-Serve](https://arxiv.org/abs/2403.02310), OSDI 2024: chunked
-   prefill and the per-step token budget. Finding 3 measures that trade-off directly.
-4. Agrawal et al., [Vidur](https://arxiv.org/abs/2405.05465), MLSys 2024: predicts
-   iteration time from profiled operator costs. Finding 4's step-cost model is a small
-   instance.
-5. Agrawal et al., [Etalon](https://arxiv.org/abs/2407.07000), 2024: averaged metrics
-   such as TPOT hide jitter. Here, the token budget with the best median ITL has the
-   worst p99.
-6. Hoefler and Belli,
-   [Scientific Benchmarking of Parallel Computing Systems](https://doi.org/10.1145/2807591.2807644),
-   SC 2015: the reporting and repetition practices this study follows.
-7. Schroeder et al.,
-   [Open Versus Closed: A Cautionary Tale](https://www.usenix.org/legacy/event/nsdi06/tech/schroeder.html),
-   NSDI 2006: closed-loop load generators hide queueing, which bounds findings 2 and 5.
-
-Each report has a related-evidence section that checks its findings against these and
-other sources; the [Phase C report](reports/milestone3-20261003T201214Z-phase-c.md) is
-the most complete.
-
-## Status and next steps
-
-| Milestone | Question | Status |
-|---|---|---|
-| 1–2 | Concurrency effect, then repeated under explicit cache, sampling, and model controls | Complete ([1](reports/milestone1-20261001T205137Z.md), [2](reports/milestone2-20261003T034456Z.md)) |
-| 3 | Workload regimes, concurrency crossover, GPU contention, token-budget intervention | Complete ([B](reports/milestone3-20261003T180358Z-phase-b.md), [C](reports/milestone3-20261003T201214Z-phase-c.md), [D](reports/milestone3-20261006T022744Z-phase-d.md)) |
-| 4 | Measurement-driven backend selection | Deferred: entry gate not met ([roadmap](experiments/roadmap.md)) |
-| 5 (pilot) | Prompt length versus token budget, with a per-step scheduler log | Complete: C32 block ([report](reports/milestone5-20261025T004640Z-pilot.md)); Part 2, the C8 block and a context-length test ([report](reports/milestone5p2-20261029T000043Z-part2.md)) |
-| Reanalysis | Post hoc: step timing, a step-cost model, uncertainty, steady state, clocks | Complete ([report](reports/reanalysis-20261028.md)) |
-| 5–9 | Full workload-shape study, network, host contention, GPU contention, crossed factors | Proposed |
-
-Proposed milestones have no data yet, and each needs its own pre-registered protocol
-first. Scope and status: [roadmap](experiments/roadmap.md).
+Milestones 1–3 and the Milestone 5 pilot are complete, with a post hoc reanalysis;
+Milestone 4 is deferred, and the full Milestones 5–9 are proposed. Details:
+[roadmap](experiments/roadmap.md).
 
 ## Reproduce
 
@@ -164,21 +94,12 @@ python scripts/run_experiment.py --config configs/milestone1-forward.toml \
   --series-id DEVICE-MODEL-forward-01 --dry-run
 ```
 
-The full guide (preflight, runs, validation, analysis, and instrumentation) is in
-[`docs/reproduce.md`](docs/reproduce.md). Raw data aren't in this repository; each
-report's artifact record gives the archive name and checksum.
+Full guide: [`docs/reproduce.md`](docs/reproduce.md). Raw data aren't in this
+repository; each report gives the archive name and checksum.
 
 ## Limitations
 
-One model, one GPU, and one framework version limit generality. Load is closed-loop,
-client and server share a host (so there's no network realism), and prompts are
-generated. Findings are measured associations under controlled changes; server
-metrics and telemetry corroborate them but don't prove causation on their own.
-
-## Repository layout
-
-`configs/` experiment inputs · `scripts/` orchestration around the vLLM CLI ·
-`src/bottleneckshift/` validation, manifests, and parsers · `analysis/` post-processing
-and figures · `experiments/` protocols written before running · `reports/` scored
-results · `docs/` [glossary](docs/glossary.md), [reproduction guide](docs/reproduce.md),
-and [workflow](docs/milestone-workflow.md).
+One model, one GPU, and one vLLM version. Load is closed-loop, client and server
+share a host, and prompts are generated. Findings are measured associations under
+controlled changes; server metrics and telemetry support them but don't prove
+causation.
